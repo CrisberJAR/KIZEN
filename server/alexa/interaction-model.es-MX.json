@@ -1,0 +1,107 @@
+{
+  "interactionModel": {
+    "languageModel": {
+      "invocationName": "asistente jarvis",
+      "intents": [
+        { "name": "AMAZON.CancelIntent", "samples": [] },
+        { "name": "AMAZON.HelpIntent", "samples": [] },
+        { "name": "AMAZON.StopIntent", "samples": [] },
+        { "name": "AMAZON.FallbackIntent", "samples": [] },
+        { "name": "AMAZON.NavigateHomeIntent", "samples": [] },
+        {
+          "name": "AddTaskIntent",
+          "slots": [{ "name": "title", "type": "AMAZON.SearchQuery" }],
+          "samples": [
+            "agrega {title}",
+            "agregar {title}",
+            "añade {title}",
+            "agrega la tarea {title}",
+            "anota {title}",
+            "apunta {title}",
+            "crea una tarea {title}",
+            "recuérdame {title}"
+          ]
+        },
+        {
+          "name": "CompleteTaskIntent",
+          "slots": [{ "name": "title", "type": "AMAZON.SearchQuery" }],
+          "samples": [
+            "completa {title}",
+            "marca {title} como hecha",
+            "ya hice {title}",
+            "terminé {title}"
+          ]
+        },
+        {
+          "name": "ListTasksIntent",
+          "slots": [],
+          "samples": [
+            "qué tareas tengo",
+            "lista mis tareas",
+            "cuáles son mis tareas",
+            "cuales son mis tareas",
+            "cuáles son mis pendientes",
+            "qué me falta"
+          ]
+        },
+        {
+          "name": "AddToListIntent",
+          "slots": [{ "name": "title", "type": "AMAZON.SearchQuery" }],
+          "samples": [
+            "agrega a la lista {title}",
+            "pon en la lista {title}"
+          ]
+        },
+        {
+          "name": "AddHabitIntent",
+          "slots": [{ "name": "title", "type": "AMAZON.SearchQuery" }],
+          "samples": [
+            "agrega el hábito {title}",
+            "quiero el hábito {title}",
+            "crea un hábito {title}"
+          ]
+        },
+        {
+          "name": "CompleteHabitIntent",
+          "slots": [{ "name": "title", "type": "AMAZON.SearchQuery" }],
+          "samples": [
+            "completé el hábito {title}",
+            "ya hice el hábito {title}",
+            "marca el hábito {title}"
+          ]
+        },
+        {
+          "name": "ListHabitsIntent",
+          "slots": [],
+          "samples": [
+            "cuáles son mis hábitos",
+            "lista mis hábitos",
+            "qué hábitos tengo"
+          ]
+        },
+        {
+          "name": "StreakIntent",
+          "slots": [],
+          "samples": [
+            "cuál es mi racha",
+            "cuántos días llevo",
+            "dime mi racha"
+          ]
+        },
+        {
+          "name": "InsightsIntent",
+          "slots": [],
+          "samples": [
+            "cómo voy",
+            "cómo voy hoy",
+            "cómo estoy",
+            "cómo estoy hoy",
+            "resumen del día",
+            "qué tal el día"
+          ]
+        }
+      ],
+      "types": []
+    }
+  }
+}

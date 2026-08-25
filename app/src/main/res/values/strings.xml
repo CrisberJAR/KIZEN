@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Kizen</string>
+    <string name="channel_reminders">Recordatorios</string>
+    <string name="channel_reminders_desc">Avisos de tus tareas en Kizen</string>
+</resources>

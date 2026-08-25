@@ -1,0 +1,2 @@
+-keep class com.kizen.tasks.** { *; }
+-dontwarn javax.annotation.**

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ic_launcher_background">#FFF8F4</color>
+    <color name="splash_bg">#FFF8F4</color>
+    <color name="pink_soft">#F8C8DC</color>
+    <color name="sky">#A8D8EA</color>
+    <color name="mint">#B5EAD7</color>
+    <color name="lavender">#C7CEEA</color>
+    <color name="cream">#FFF2CC</color>
+</resources>

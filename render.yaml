@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: kizen-api
+    runtime: node
+    rootDir: server
+    plan: free
+    buildCommand: "true"
+    startCommand: node index.mjs
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: KIZEN_HOME_USER
+        value: kizen-casa
+      - key: GEMINI_API_KEY
+        sync: false

@@ -1,0 +1,11 @@
+{
+  "name": "kizen-api",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node index.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
