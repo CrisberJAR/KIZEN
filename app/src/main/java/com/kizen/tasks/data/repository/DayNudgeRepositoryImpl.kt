@@ -15,10 +15,10 @@ import com.kizen.tasks.sync.TombstoneStore
 import com.kizen.tasks.widget.WidgetRefresher
 import dagger.hilt.android.qualifiers.ApplicationContext
 import android.content.Context
+import com.kizen.tasks.domain.model.KizenDates
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
-import java.time.LocalDate
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -35,13 +35,13 @@ class DayNudgeRepositoryImpl @Inject constructor(
 ) : DayNudgeRepository {
 
     override fun observeToday(): Flow<List<DayNudge>> {
-        val today = LocalDate.now().toEpochDay()
         return combine(
-            nudgeDao.observeDay(today),
+            nudgeDao.observeAll(),
             itemDao.observeAll(),
         ) { nudges, items ->
+            val today = KizenDates.todayEpoch()
             val grouped = items.groupBy { it.nudgeId }
-            nudges.map { entity ->
+            nudges.filter { it.dayEpoch == today }.map { entity ->
                 entity.toDomain(grouped[entity.id].orEmpty().sortedBy { it.position }.map { it.toDomain() })
             }
         }
@@ -51,7 +51,7 @@ class DayNudgeRepositoryImpl @Inject constructor(
         itemDao.observeByNudge(nudgeId).map { rows -> rows.map { it.toDomain() } }
 
     override suspend fun todaySnapshot(): List<DayNudge> {
-        val today = LocalDate.now().toEpochDay()
+        val today = KizenDates.todayEpoch()
         return nudgeDao.forDay(today).map { entity ->
             entity.toDomain(itemDao.forNudge(entity.id).map { it.toDomain() })
         }
@@ -112,14 +112,14 @@ class DayNudgeRepositoryImpl @Inject constructor(
     }
 
     override suspend fun pendingToday(): List<DayNudge> {
-        val today = LocalDate.now().toEpochDay()
+        val today = KizenDates.todayEpoch()
         return nudgeDao.pendingToday(today).map { entity ->
             entity.toDomain(itemDao.forNudge(entity.id).map { it.toDomain() })
         }
     }
 
     override suspend fun pruneOlderThanYesterday() {
-        val today = LocalDate.now().toEpochDay()
+        val today = KizenDates.todayEpoch()
         nudgeDao.pendingBefore(today).forEach { reminderScheduler.cancelNudge(it.id) }
         nudgeDao.deleteOlderThan(today)
         widgetRefresher.refresh()

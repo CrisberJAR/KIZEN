@@ -23,6 +23,9 @@ interface DayNudgeDao {
     @Query("SELECT * FROM day_nudges WHERE isDone = 0 AND dayEpoch < :dayEpoch")
     suspend fun pendingBefore(dayEpoch: Long): List<DayNudgeEntity>
 
+    @Query("SELECT * FROM day_nudges ORDER BY isDone ASC, startAt ASC")
+    fun observeAll(): Flow<List<DayNudgeEntity>>
+
     @Query("SELECT * FROM day_nudges")
     suspend fun all(): List<DayNudgeEntity>
 

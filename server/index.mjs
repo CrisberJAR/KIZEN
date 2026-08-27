@@ -28,7 +28,7 @@ function loadDotEnv(file) {
 
 fs.mkdirSync(DATA, { recursive: true });
 
-const TZ = process.env.KIZEN_TZ || "America/Mexico_City";
+const TZ = process.env.KIZEN_TZ || "America/Lima";
 const empty = () => ({
   lists: [],
   tasks: [],
@@ -56,6 +56,15 @@ function fileFor(userId) {
   return path.join(DATA, `${hash}.json`);
 }
 
+const userLocks = new Map();
+
+function withUserLock(userId, job) {
+  const prev = userLocks.get(userId) || Promise.resolve();
+  const next = prev.then(job, job);
+  userLocks.set(userId, next.catch(() => {}));
+  return next;
+}
+
 function load(userId) {
   const file = fileFor(userId);
   if (!fs.existsSync(file)) return empty();
@@ -71,7 +80,7 @@ function load(userId) {
     data.deleted_habits = Array.isArray(data.deleted_habits) ? data.deleted_habits : [];
     data.deleted_day_nudges = Array.isArray(data.deleted_day_nudges) ? data.deleted_day_nudges : [];
     data.deleted_lists = Array.isArray(data.deleted_lists) ? data.deleted_lists : [];
-    if (data.day_nudges.length !== rawNudges.length) save(userId, data);
+    if (JSON.stringify(data.day_nudges) !== JSON.stringify(rawNudges)) save(userId, data);
     if (!data.alexa || typeof data.alexa !== "object") data.alexa = null;
     return data;
   } catch {
@@ -99,7 +108,7 @@ function mergeDeleted(localItems, remoteItems) {
   const map = new Map();
   for (const item of [...(localItems || []), ...(remoteItems || [])]) {
     if (!item || !item.id) continue;
-    const at = Number(item.deleted_at || 0);
+    const at = Number(item.deleted_at ?? item.deletedAt ?? 0);
     const prev = map.get(item.id);
     if (prev == null || at >= prev) map.set(item.id, at);
   }
@@ -138,9 +147,21 @@ function dayEpoch() {
   return Math.floor(Date.UTC(num("year"), num("month") - 1, num("day")) / 86_400_000);
 }
 
+function normalizeNudgeDay(item) {
+  if (!item || typeof item !== "object") return item;
+  const today = dayEpoch();
+  const epoch = Number(item.day_epoch);
+  if (Number.isFinite(epoch) && Math.abs(epoch - today) <= 1) {
+    return { ...item, day_epoch: today };
+  }
+  return item;
+}
+
 function pruneDayNudges(items) {
   const today = dayEpoch();
-  return (items || []).filter((item) => Number(item.day_epoch) >= today);
+  return (items || [])
+    .map(normalizeNudgeDay)
+    .filter((item) => Number(item.day_epoch) >= today);
 }
 
 function todayNudges(user) {
@@ -412,26 +433,28 @@ http
       }
       if (req.method === "PUT" && url.pathname === "/api/v3/sync") {
         const incoming = await bodyOf(req);
-        const local = load(userId);
-        const deleted_tasks = mergeDeleted(local.deleted_tasks, incoming.deleted_tasks);
-        const deleted_habits = mergeDeleted(local.deleted_habits, incoming.deleted_habits);
-        const deleted_day_nudges = mergeDeleted(local.deleted_day_nudges, incoming.deleted_day_nudges);
-        const deleted_lists = mergeDeleted(local.deleted_lists, incoming.deleted_lists);
-        const merged = {
-          lists: withoutDeleted(mergeById(local.lists, incoming.lists), deleted_lists),
-          tasks: withoutDeleted(mergeById(local.tasks, incoming.tasks), deleted_tasks),
-          habits: withoutDeleted(mergeById(local.habits, incoming.habits), deleted_habits),
-          habit_logs: mergeLogs(local.habit_logs, incoming.habit_logs),
-          day_nudges: pruneDayNudges(withoutDeleted(mergeById(local.day_nudges, incoming.day_nudges), deleted_day_nudges)),
-          deleted_tasks,
-          deleted_habits,
-          deleted_day_nudges,
-          deleted_lists,
-          alexa: local.alexa || null,
-        };
-        save(userId, merged);
-        await silenceDoneNudges(merged, userId, save).catch(() => {});
-        return json(res, 200, clientSnapshot(merged));
+        return withUserLock(userId, async () => {
+          const local = load(userId);
+          const deleted_tasks = mergeDeleted(local.deleted_tasks, incoming.deleted_tasks);
+          const deleted_habits = mergeDeleted(local.deleted_habits, incoming.deleted_habits);
+          const deleted_day_nudges = mergeDeleted(local.deleted_day_nudges, incoming.deleted_day_nudges);
+          const deleted_lists = mergeDeleted(local.deleted_lists, incoming.deleted_lists);
+          const merged = {
+            lists: withoutDeleted(mergeById(local.lists, incoming.lists), deleted_lists),
+            tasks: withoutDeleted(mergeById(local.tasks, incoming.tasks), deleted_tasks),
+            habits: withoutDeleted(mergeById(local.habits, incoming.habits), deleted_habits),
+            habit_logs: mergeLogs(local.habit_logs, incoming.habit_logs),
+            day_nudges: pruneDayNudges(withoutDeleted(mergeById(local.day_nudges, incoming.day_nudges), deleted_day_nudges)),
+            deleted_tasks,
+            deleted_habits,
+            deleted_day_nudges,
+            deleted_lists,
+            alexa: local.alexa || null,
+          };
+          save(userId, merged);
+          await silenceDoneNudges(merged, userId, save).catch(() => {});
+          return json(res, 200, clientSnapshot(merged));
+        });
       }
       if (req.method === "GET" && url.pathname === "/api/v3/tasks/insights") {
         return json(res, 200, insights(load(userId)));

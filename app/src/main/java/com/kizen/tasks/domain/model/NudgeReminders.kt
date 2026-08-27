@@ -3,7 +3,7 @@ package com.kizen.tasks.domain.model
 fun nextNudgeMillis(
     nudge: DayNudge,
     nowMillis: Long = System.currentTimeMillis(),
-    todayEpoch: Long = java.time.LocalDate.now().toEpochDay(),
+    todayEpoch: Long = KizenDates.todayEpoch(),
 ): Long? {
     if (nudge.isDone) return null
     if (nudge.dayEpoch != todayEpoch) return null

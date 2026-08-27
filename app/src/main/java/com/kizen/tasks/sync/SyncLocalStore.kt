@@ -16,6 +16,7 @@ import com.kizen.tasks.data.local.entity.SubtaskEntity
 import com.kizen.tasks.data.local.entity.TaskEntity
 import com.kizen.tasks.data.local.entity.TaskListEntity
 import com.kizen.tasks.data.local.toDomain
+import com.kizen.tasks.domain.model.KizenDates
 import com.kizen.tasks.domain.model.Priority
 import com.kizen.tasks.domain.model.RepeatDays
 import com.kizen.tasks.domain.repository.HabitRepository
@@ -24,7 +25,6 @@ import com.kizen.tasks.notification.ReminderScheduler
 import com.kizen.tasks.widget.WidgetRefresher
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.time.DayOfWeek
-import java.time.LocalDate
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -95,6 +95,10 @@ class SyncLocalStore @Inject constructor(
                 dto.subtasks.forEach { subtaskDao.upsert(it.toEntity(dto.id)) }
             }
         }
+        tombstones.taskIds().forEach { id ->
+            reminderScheduler.cancel(id)
+            taskDao.delete(id)
+        }
         remote.habits.forEach { dto ->
             if (dto.id in tombstones.habitIds()) return@forEach
             val local = habitDao.get(dto.id)
@@ -103,11 +107,12 @@ class SyncLocalStore @Inject constructor(
             }
         }
         remote.habitLogs.forEach { habitLogDao.upsert(it.toEntity()) }
+        val today = KizenDates.todayEpoch()
         remote.dayNudges.forEach { dto ->
             if (dto.id in tombstones.nudgeIds()) return@forEach
             val local = dayNudgeDao.get(dto.id)
             if (local == null || dto.updatedAt >= local.updatedAt) {
-                dayNudgeDao.upsert(dto.toEntity(local?.createdAt))
+                dayNudgeDao.upsert(dto.toEntity(local?.createdAt, today))
                 nudgeItemDao.deleteByNudge(dto.id)
                 dto.items.forEach { nudgeItemDao.upsert(it.toEntity(dto.id)) }
             }
@@ -115,7 +120,6 @@ class SyncLocalStore @Inject constructor(
         habitRepository.recalculateStreaks()
         habitRepository.pendingReminders().forEach { reminderScheduler.syncHabit(it) }
         taskDao.allWithList().forEach { reminderScheduler.sync(it.toDomain()) }
-        val today = LocalDate.now().toEpochDay()
         dayNudgeDao.pendingBefore(today).forEach { reminderScheduler.cancelNudge(it.id) }
         dayNudgeDao.deleteOlderThan(today)
         dayNudgeDao.forDay(today).forEach { entity ->
@@ -124,6 +128,19 @@ class SyncLocalStore @Inject constructor(
             if (domain.isDone) {
                 KizenNotifier.cancel(context, "nudge:${domain.id}".hashCode())
             }
+        }
+        tombstones.habitIds().forEach { id ->
+            reminderScheduler.cancelHabit(id)
+            habitDao.delete(id)
+        }
+        tombstones.nudgeIds().forEach { id ->
+            reminderScheduler.cancelNudge(id)
+            KizenNotifier.cancel(context, "nudge:$id".hashCode())
+            dayNudgeDao.delete(id)
+        }
+        tombstones.taskIds().forEach { id ->
+            reminderScheduler.cancel(id)
+            taskDao.delete(id)
         }
         widgetRefresher.refresh()
     }
@@ -259,14 +276,14 @@ private fun DayNudgeEntity.toDto(items: List<NudgeItemDto>) = DayNudgeDto(
     items = items,
 )
 
-private fun DayNudgeDto.toEntity(createdAt: Long?) = DayNudgeEntity(
+private fun DayNudgeDto.toEntity(createdAt: Long?, todayEpoch: Long) = DayNudgeEntity(
     id = id,
     title = title,
     notes = notes,
     startAt = startAt,
     intervalMinutes = intervalMinutes.coerceAtLeast(5),
     isDone = isDone,
-    dayEpoch = dayEpoch,
+    dayEpoch = if (kotlin.math.abs(dayEpoch - todayEpoch) <= 1L) todayEpoch else dayEpoch,
     createdAt = createdAt ?: this.createdAt,
     updatedAt = updatedAt,
 )

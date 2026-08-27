@@ -13,7 +13,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.time.LocalDate
+import com.kizen.tasks.domain.model.KizenDates
 import java.util.UUID
 import javax.inject.Inject
 
@@ -128,7 +128,7 @@ class NudgeEditorViewModel @Inject constructor(
                     startAt = state.startAt,
                     intervalMinutes = state.intervalMinutes,
                     isDone = previous?.isDone ?: false,
-                    dayEpoch = previous?.dayEpoch ?: LocalDate.now().toEpochDay(),
+                    dayEpoch = previous?.dayEpoch ?: KizenDates.todayEpoch(),
                     createdAt = previous?.createdAt ?: now,
                     updatedAt = now,
                     items = state.items,

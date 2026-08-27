@@ -68,6 +68,7 @@ class TaskRepositoryImpl @Inject constructor(
         val task = taskDao.getById(id)?.toDomain()
         if (task != null) reminderScheduler.sync(task)
         widgetRefresher.refresh()
+        pushCloud()
     }
 
     override suspend fun delete(id: String) {
@@ -75,7 +76,7 @@ class TaskRepositoryImpl @Inject constructor(
         tombstones.markTask(id)
         taskDao.delete(id)
         widgetRefresher.refresh()
-        pushCloud()
+        if (syncPort.isEnabled) runCatching { syncPort.sync() }
     }
 
     override suspend fun upsertSubtask(subtask: Subtask) {

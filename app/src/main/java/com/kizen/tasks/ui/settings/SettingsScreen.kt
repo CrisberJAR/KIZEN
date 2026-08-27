@@ -104,7 +104,7 @@ fun SettingsScreen(
             SoftCard(modifier = Modifier.fillMaxWidth()) {
                 Text("URL del servidor", style = KizenTypography.titleMedium)
                 Text(
-                    "Echo Dot no puede usar localhost. Pon aquí la URL HTTPS de Render/Railway. El emulador: http://10.0.2.2:8787",
+                    "En el teléfono usa https://kizen-api.onrender.com. El id de casa debe ser kizen-casa en los dos. El emulador: http://10.0.2.2:8787",
                     style = KizenTypography.bodyMedium,
                     color = TextMute,
                     modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),

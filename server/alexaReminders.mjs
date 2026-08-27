@@ -2,7 +2,7 @@
 
 const DEBOUNCE_MS = 90_000;
 const RING_IN_SECONDS = 60;
-const TZ = process.env.KIZEN_TZ || "America/Mexico_City";
+const TZ = process.env.KIZEN_TZ || "America/Lima";
 
 export function clientSnapshot(user) {
   const copy = { ...(user || {}) };

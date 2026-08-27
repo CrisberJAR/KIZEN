@@ -13,8 +13,8 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 data class SettingsUiState(
-    val enabled: Boolean = false,
-    val baseUrl: String = SyncSettings.DEFAULT_URL,
+    val enabled: Boolean = true,
+    val baseUrl: String = SyncSettings.CLOUD_URL,
     val userId: String = "",
     val busy: Boolean = false,
     val message: String = "",

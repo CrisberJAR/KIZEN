@@ -20,8 +20,13 @@ class HttpSyncPort @Inject constructor(
 
     override suspend fun push(): Result<Unit> = runCatching {
         if (!settings.isEnabled) return@runCatching
-        apiFactory.api().putSync(store.export())
-        Unit
+        store.merge(apiFactory.api().putSync(store.export()))
+    }
+
+    override suspend fun sync(): Result<Unit> = runCatching {
+        if (!settings.isEnabled) return@runCatching
+        runCatching { store.merge(apiFactory.api().getSync()) }
+        store.merge(apiFactory.api().putSync(store.export()))
     }
 }
 

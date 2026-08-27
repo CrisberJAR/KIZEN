@@ -23,6 +23,7 @@ class TombstoneStore @Inject constructor(
     )
 
     private val lock = Any()
+    private var bag: Bag = prune(readPrefs())
 
     fun markTask(id: String) = mark { it.copy(tasks = it.tasks + (id to now())) }
     fun markHabit(id: String) = mark { it.copy(habits = it.habits + (id to now())) }
@@ -45,36 +46,42 @@ class TombstoneStore @Inject constructor(
     fun exportLists(): List<DeletedRefDto> = snapshot().lists.map { DeletedRefDto(it.key, it.value) }
 
     fun absorb(tasks: List<DeletedRefDto>, habits: List<DeletedRefDto>, nudges: List<DeletedRefDto>, lists: List<DeletedRefDto>) {
-        mark { bag ->
-            bag.copy(
-                tasks = mergeMaps(bag.tasks, tasks),
-                habits = mergeMaps(bag.habits, habits),
-                dayNudges = mergeMaps(bag.dayNudges, nudges),
-                lists = mergeMaps(bag.lists, lists),
+        mark { current ->
+            current.copy(
+                tasks = mergeMaps(current.tasks, tasks),
+                habits = mergeMaps(current.habits, habits),
+                dayNudges = mergeMaps(current.dayNudges, nudges),
+                lists = mergeMaps(current.lists, lists),
             )
         }
     }
 
-    private fun snapshot(): Bag = synchronized(lock) { prune(read()) }
+    private fun snapshot(): Bag = synchronized(lock) { prune(bag) }
 
     private fun mark(block: (Bag) -> Bag) {
         synchronized(lock) {
-            write(prune(block(read())))
+            bag = prune(block(bag))
+            writePrefs(bag)
         }
     }
 
-    private fun read(): Bag = runCatching {
+    private fun readPrefs(): Bag = runCatching {
         json.decodeFromString(Bag.serializer(), prefs.getString(KEY, "{}").orEmpty().ifBlank { "{}" })
     }.getOrDefault(Bag())
 
-    private fun write(bag: Bag) {
-        prefs.edit().putString(KEY, json.encodeToString(Bag.serializer(), bag)).apply()
+    private fun writePrefs(value: Bag) {
+        prefs.edit().putString(KEY, json.encodeToString(Bag.serializer(), value)).commit()
     }
 
-    private fun prune(bag: Bag): Bag {
+    private fun prune(value: Bag): Bag {
         val cutoff = now() - THIRTY_DAYS
         fun Map<String, Long>.fresh() = filterValues { it >= cutoff }
-        return bag.copy(tasks = bag.tasks.fresh(), habits = bag.habits.fresh(), dayNudges = bag.dayNudges.fresh(), lists = bag.lists.fresh())
+        return value.copy(
+            tasks = value.tasks.fresh(),
+            habits = value.habits.fresh(),
+            dayNudges = value.dayNudges.fresh(),
+            lists = value.lists.fresh(),
+        )
     }
 
     private fun mergeMaps(local: Map<String, Long>, remote: List<DeletedRefDto>): Map<String, Long> {
