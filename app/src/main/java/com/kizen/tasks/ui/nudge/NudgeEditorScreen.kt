@@ -94,6 +94,11 @@ fun NudgeEditorScreen(
                     style = KizenTypography.headlineSmall,
                     modifier = Modifier.weight(1f),
                 )
+                if (!state.isNew) {
+                    IconButton(onClick = viewModel::delete) {
+                        Icon(Icons.Rounded.Delete, contentDescription = "Eliminar aviso", tint = TextMute)
+                    }
+                }
                 TextButton(onClick = viewModel::save) {
                     Text("Guardar", color = PinkDeep, style = KizenTypography.titleMedium)
                 }

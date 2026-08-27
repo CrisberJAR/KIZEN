@@ -6,6 +6,7 @@ import com.kizen.tasks.data.local.toDomain
 import com.kizen.tasks.data.local.toEntity
 import com.kizen.tasks.domain.model.Subtask
 import com.kizen.tasks.domain.model.Task
+import com.kizen.tasks.domain.model.KizenDates
 import com.kizen.tasks.domain.repository.TaskRepository
 import com.kizen.tasks.notification.ReminderScheduler
 import com.kizen.tasks.sync.SyncPort
@@ -14,8 +15,6 @@ import com.kizen.tasks.widget.WidgetRefresher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
-import java.time.LocalDate
-import java.time.ZoneId
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -30,9 +29,8 @@ class TaskRepositoryImpl @Inject constructor(
 ) : TaskRepository {
 
     override fun observeToday(): Flow<List<Task>> {
-        val zone = ZoneId.systemDefault()
-        val start = LocalDate.now(zone).atStartOfDay(zone).toInstant().toEpochMilli()
-        val end = LocalDate.now(zone).plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli() - 1
+        val start = KizenDates.dayStartMillis()
+        val end = KizenDates.dayEndMillis()
         return taskDao.observeToday(start, end)
             .map { rows -> rows.map { it.toDomain() } }
             .distinctUntilChanged()
@@ -82,15 +80,19 @@ class TaskRepositoryImpl @Inject constructor(
     override suspend fun upsertSubtask(subtask: Subtask) {
         subtaskDao.upsert(subtask.toEntity())
         widgetRefresher.refresh()
+        pushCloud()
     }
 
     override suspend fun setSubtaskDone(id: String, done: Boolean) {
         subtaskDao.setDone(id, done, System.currentTimeMillis())
         widgetRefresher.refresh()
+        pushCloud()
     }
 
     override suspend fun deleteSubtask(id: String) {
         subtaskDao.delete(id)
+        widgetRefresher.refresh()
+        pushCloud()
     }
 
     override suspend fun pendingReminders(): List<Task> =

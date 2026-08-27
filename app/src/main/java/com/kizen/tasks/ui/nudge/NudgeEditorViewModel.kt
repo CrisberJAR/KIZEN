@@ -154,5 +154,5 @@ class NudgeEditorViewModel @Inject constructor(
 }
 
 private fun defaultStartAt(): Long =
-    java.time.ZonedDateTime.now().plusMinutes(30).withSecond(0).withNano(0).toInstant().toEpochMilli()
+    java.time.ZonedDateTime.now(KizenDates.ZONE).plusMinutes(1).withSecond(0).withNano(0).toInstant().toEpochMilli()
 

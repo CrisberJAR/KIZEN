@@ -6,13 +6,13 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-private val zone: ZoneId get() = ZoneId.systemDefault()
+private val zone: ZoneId get() = com.kizen.tasks.domain.model.KizenDates.ZONE
 private val timeFmt = DateTimeFormatter.ofPattern("HH:mm", Locale("es", "MX"))
 private val dateFmt = DateTimeFormatter.ofPattern("EEE d MMM", Locale("es", "MX"))
 private val dateTimeFmt = DateTimeFormatter.ofPattern("EEE d MMM · HH:mm", Locale("es", "MX"))
 
 fun greeting(): String {
-    val hour = java.time.LocalTime.now().hour
+    val hour = java.time.LocalTime.now(com.kizen.tasks.domain.model.KizenDates.ZONE).hour
     return when {
         hour < 12 -> "Buenos días"
         hour < 19 -> "Buenas tardes"
@@ -29,7 +29,7 @@ fun formatDate(epochMs: Long): String =
 fun formatDateTime(epochMs: Long): String =
     Instant.ofEpochMilli(epochMs).atZone(zone).format(dateTimeFmt)
 
-fun dayStartMillis(date: LocalDate = LocalDate.now()): Long =
+fun dayStartMillis(date: LocalDate = com.kizen.tasks.domain.model.KizenDates.today()): Long =
     date.atStartOfDay(zone).toInstant().toEpochMilli()
 
 fun formatMinutesOfDay(minutes: Int): String {

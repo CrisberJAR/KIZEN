@@ -118,6 +118,7 @@ class SyncLocalStore @Inject constructor(
         val today = KizenDates.todayEpoch()
         remote.dayNudges.forEach { dto ->
             if (dto.id in tombstones.nudgeIds()) return@forEach
+            if (dto.dayEpoch < today - 1L) return@forEach
             val local = dayNudgeDao.get(dto.id)
             if (local == null || dto.updatedAt >= local.updatedAt) {
                 dayNudgeDao.upsert(dto.toEntity(local?.createdAt, today))
@@ -291,7 +292,7 @@ private fun DayNudgeDto.toEntity(createdAt: Long?, todayEpoch: Long) = DayNudgeE
     startAt = startAt,
     intervalMinutes = intervalMinutes.coerceAtLeast(5),
     isDone = isDone,
-    dayEpoch = todayEpoch,
+    dayEpoch = if (kotlin.math.abs(dayEpoch - todayEpoch) <= 1L) todayEpoch else dayEpoch,
     createdAt = createdAt ?: this.createdAt,
     updatedAt = updatedAt,
 )

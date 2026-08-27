@@ -4,7 +4,7 @@ import java.time.ZonedDateTime
 
 fun nextHabitReminderMillis(
     habit: Habit,
-    now: ZonedDateTime = ZonedDateTime.now(),
+    now: ZonedDateTime = ZonedDateTime.now(KizenDates.ZONE),
 ): Long? {
     val minutes = habit.reminderMinutes ?: return null
     if (!habit.isActive || habit.repeatDays.isEmpty()) return null

@@ -8,7 +8,6 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalTime
-import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
@@ -36,7 +35,7 @@ class MaintenanceScheduler @Inject constructor(
     }
 
     private fun millisUntilNextRun(): Long {
-        val zone = ZoneId.systemDefault()
+        val zone = com.kizen.tasks.domain.model.KizenDates.ZONE
         val now = ZonedDateTime.now(zone)
         var next = LocalDate.now(zone).atTime(LocalTime.of(0, 5)).atZone(zone)
         if (!next.isAfter(now)) next = next.plusDays(1)

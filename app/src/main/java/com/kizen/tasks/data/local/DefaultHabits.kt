@@ -18,7 +18,7 @@ object DefaultHabits {
             currentStreak = 0,
             longestStreak = 0,
             createdAt = now,
-            updatedAt = now,
+            updatedAt = 1L,
             remoteId = null,
         ),
         HabitEntity(
@@ -34,7 +34,7 @@ object DefaultHabits {
             currentStreak = 0,
             longestStreak = 0,
             createdAt = now,
-            updatedAt = now,
+            updatedAt = 1L,
             remoteId = null,
         ),
         HabitEntity(
@@ -50,7 +50,7 @@ object DefaultHabits {
             currentStreak = 0,
             longestStreak = 0,
             createdAt = now,
-            updatedAt = now,
+            updatedAt = 1L,
             remoteId = null,
         ),
         HabitEntity(
@@ -66,7 +66,7 @@ object DefaultHabits {
             currentStreak = 0,
             longestStreak = 0,
             createdAt = now,
-            updatedAt = now,
+            updatedAt = 1L,
             remoteId = null,
         ),
         HabitEntity(
@@ -82,7 +82,7 @@ object DefaultHabits {
             currentStreak = 0,
             longestStreak = 0,
             createdAt = now,
-            updatedAt = now,
+            updatedAt = 1L,
             remoteId = null,
         ),
     )

@@ -1,6 +1,8 @@
 package com.kizen.tasks.sync
 
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -11,33 +13,37 @@ class HttpSyncPort @Inject constructor(
     private val apiFactory: KizenApiFactory,
 ) : SyncPort {
 
+    private val gate = Mutex()
+
     override val isEnabled: Boolean
         get() = settings.isEnabled
 
     override suspend fun pull(): Result<Unit> = runCatching {
         if (!settings.isEnabled) return@runCatching
-        store.merge(apiFactory.api().getSync())
+        gate.withLock { store.merge(apiFactory.api().getSync()) }
     }
 
     override suspend fun push(): Result<Unit> = runCatching {
         if (!settings.isEnabled) return@runCatching
-        store.merge(apiFactory.api().putSync(store.export()))
+        gate.withLock { store.merge(apiFactory.api().putSync(store.export())) }
     }
 
     override suspend fun sync(): Result<Unit> = runCatching {
         if (!settings.isEnabled) return@runCatching
-        var lastError: Throwable? = null
-        repeat(3) { attempt ->
-            try {
-                runCatching { store.merge(apiFactory.api().getSync()) }
-                store.merge(apiFactory.api().putSync(store.export()))
-                return@runCatching
-            } catch (error: Throwable) {
-                lastError = error
-                if (attempt < 2) delay(2_000L * (attempt + 1))
+        gate.withLock {
+            var lastError: Throwable? = null
+            repeat(3) { attempt ->
+                try {
+                    store.merge(apiFactory.api().getSync())
+                    store.merge(apiFactory.api().putSync(store.export()))
+                    return@withLock
+                } catch (error: Throwable) {
+                    lastError = error
+                    if (attempt < 2) delay(2_000L * (attempt + 1))
+                }
             }
+            throw lastError ?: IllegalStateException("No pude sincronizar")
         }
-        throw lastError ?: IllegalStateException("No pude sincronizar")
     }
 }
 

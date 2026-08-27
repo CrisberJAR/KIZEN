@@ -84,9 +84,11 @@ class HomeViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
+            if (syncPort.isEnabled) withContext(Dispatchers.IO) { syncPort.sync() }
             listRepository.ensureSeeded()
             habitRepository.ensureSeeded()
-            pullCloud()
+            if (syncPort.isEnabled) withContext(Dispatchers.IO) { syncPort.push() }
+            widgetRefresher.refresh()
         }
     }
 

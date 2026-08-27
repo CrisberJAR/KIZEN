@@ -128,6 +128,6 @@ class DayNudgeRepositoryImpl @Inject constructor(
     private fun nudgeNotifyId(id: String): Int = "nudge:$id".hashCode()
 
     private suspend fun pushCloud() {
-        if (syncPort.isEnabled) runCatching { syncPort.sync() }
+        if (syncPort.isEnabled) runCatching { syncPort.push() }
     }
 }

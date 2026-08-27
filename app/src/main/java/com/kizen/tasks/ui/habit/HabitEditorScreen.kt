@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilterChip
@@ -91,6 +92,11 @@ fun HabitEditorScreen(
                     style = KizenTypography.headlineSmall,
                     modifier = Modifier.weight(1f),
                 )
+                if (!state.isNew) {
+                    IconButton(onClick = viewModel::delete) {
+                        Icon(Icons.Rounded.Delete, contentDescription = "Eliminar hábito", tint = TextMute)
+                    }
+                }
                 TextButton(onClick = viewModel::save) {
                     Text("Guardar", color = PinkDeep, style = KizenTypography.titleMedium)
                 }
