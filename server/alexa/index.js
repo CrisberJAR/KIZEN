@@ -45,17 +45,28 @@ function titleFrom(handlerInput) {
   );
 }
 
+function dig(obj, keys) {
+  var cur = obj;
+  for (var i = 0; i < keys.length; i += 1) {
+    if (!cur) return null;
+    cur = cur[keys[i]];
+  }
+  if (cur === null || typeof cur === "undefined") return null;
+  return cur;
+}
+
 function hasRemindersPermission(envelope) {
-  const permissions = envelope.context?.System?.user?.permissions;
+  const permissions = dig(envelope, ["context", "System", "user", "permissions"]);
   if (!permissions) return false;
-  const scope = permissions.scopes?.[REMINDERS_SCOPE];
-  const status = String(scope?.status || "").toUpperCase();
+  const scopes = permissions.scopes || {};
+  const scope = scopes[REMINDERS_SCOPE] || {};
+  const status = String(scope.status || "").toUpperCase();
   if (status === "GRANTED") return true;
   return Boolean(permissions.consentToken);
 }
 
 function alexaLink(handlerInput) {
-  const system = handlerInput.requestEnvelope.context?.System || {};
+  const system = dig(handlerInput.requestEnvelope, ["context", "System"]) || {};
   return {
     api_endpoint: system.apiEndpoint || "https://api.amazonalexa.com",
     api_access_token: system.apiAccessToken || "",
@@ -247,9 +258,9 @@ const CancelStopHandler = {
   canHandle(handlerInput) {
     return (
       Alexa.getRequestType(handlerInput.requestEnvelope) === "IntentRequest" &&
-      ["AMAZON.CancelIntent", "AMAZON.StopIntent"].includes(
+      ["AMAZON.CancelIntent", "AMAZON.StopIntent"].indexOf(
         Alexa.getIntentName(handlerInput.requestEnvelope),
-      )
+      ) >= 0
     );
   },
   handle(handlerInput) {

@@ -2,11 +2,23 @@
 
 const DEBOUNCE_MS = 90_000;
 const RING_IN_SECONDS = 60;
+const TZ = process.env.KIZEN_TZ || "America/Mexico_City";
 
 export function clientSnapshot(user) {
   const copy = { ...(user || {}) };
   delete copy.alexa;
   return copy;
+}
+
+export function alexaStatus(user) {
+  const alexa = user?.alexa;
+  if (!alexa || !alexa.access_token) return { linked: false };
+  return {
+    linked: true,
+    has_reminders: Boolean(alexa.has_reminders),
+    token_age_min: alexa.updated_at ? Math.round((Date.now() - alexa.updated_at) / 60000) : null,
+    last_error: alexa.last_error || null,
+  };
 }
 
 export function rememberAlexa(user, body) {
@@ -23,6 +35,7 @@ export function rememberAlexa(user, body) {
     updated_at: Date.now(),
     alerts: prev.alerts && typeof prev.alerts === "object" ? prev.alerts : {},
     last_chime: prev.last_chime && typeof prev.last_chime === "object" ? prev.last_chime : {},
+    last_error: null,
   };
   return true;
 }
@@ -39,7 +52,7 @@ export async function chimeNudge(user, payload, userId, save) {
   }
 
   const nudge = (user.day_nudges || []).find((item) => item.id === id);
-  if (nudge?.is_done) {
+  if (nudge && nudge.is_done) {
     await deleteAlert(user, id);
     save(userId, user);
     return { ok: true, skipped: "done" };
@@ -53,16 +66,44 @@ export async function chimeNudge(user, payload, userId, save) {
     return { ok: false, reason: "no_alexa" };
   }
 
-  await deleteAlert(user, id);
-  const created = await createReminder(user.alexa, title);
+  const created = await createReminder(user.alexa, title, { offsetSeconds: RING_IN_SECONDS });
   if (!user.alexa.alerts) user.alexa.alerts = {};
   if (!user.alexa.last_chime) user.alexa.last_chime = {};
-  if (created.alertToken) user.alexa.alerts[id] = created.alertToken;
+  if (created.alertToken) rememberToken(user, id, created.alertToken);
   user.alexa.last_chime[id] = now;
   user.alexa.last_error = created.error || null;
   save(userId, user);
   if (created.error) return { ok: false, reason: created.error };
   return { ok: true };
+}
+
+export async function armPendingNudges(user, userId, save) {
+  if (!user.alexa?.access_token || !user.alexa?.endpoint) {
+    return { ok: false, reason: "no_alexa", count: 0 };
+  }
+  const epoch = dayEpoch();
+  const pending = (user.day_nudges || []).filter((item) => !item.is_done && Number(item.day_epoch) === epoch);
+  if (!pending.length) return { ok: true, count: 0 };
+
+  const deadline = Date.now() + 3500;
+  let count = 0;
+  let lastError = null;
+  for (const nudge of pending) {
+    const times = nextFireTimes(nudge, 6);
+    for (const when of times) {
+      if (Date.now() > deadline) break;
+      const created = await createReminder(user.alexa, nudge.title, { at: when });
+      if (created.alertToken) {
+        rememberToken(user, nudge.id, created.alertToken);
+        count += 1;
+      }
+      if (created.error) lastError = created.error;
+    }
+  }
+  user.alexa.last_error = lastError;
+  save(userId, user);
+  if (lastError && count === 0) return { ok: false, reason: lastError, count };
+  return { ok: true, count };
 }
 
 export async function silenceDoneNudges(user, userId, save) {
@@ -80,18 +121,88 @@ export async function silenceDoneNudges(user, userId, save) {
   if (changed) save(userId, user);
 }
 
+function dayEpoch() {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const num = (type) => Number(parts.find((part) => part.type === type)?.value || 0);
+  return Math.floor(Date.UTC(num("year"), num("month") - 1, num("day")) / 86_400_000);
+}
+
+function endOfTodayMs() {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const num = (type) => Number(parts.find((part) => part.type === type)?.value || 0);
+  return Date.UTC(num("year"), num("month") - 1, num("day") + 1) - 1;
+}
+
+function nextFireTimes(nudge, limit) {
+  const interval = Math.max(5, Number(nudge.interval_minutes || 20)) * 60_000;
+  const now = Date.now();
+  let next = Number(nudge.start_at || now);
+  if (next < now) {
+    const steps = Math.floor((now - next) / interval) + 1;
+    next += steps * interval;
+  }
+  if (next < now + 60_000) next = now + 65_000;
+  const end = endOfTodayMs();
+  const times = [];
+  while (times.length < limit && next < end) {
+    times.push(next);
+    next += interval;
+  }
+  return times;
+}
+
+function formatLocal(ms) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(new Date(ms));
+  const get = (type) => parts.find((part) => part.type === type)?.value || "00";
+  return `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}:${get("second")}`;
+}
+
+function rememberToken(user, id, token) {
+  if (!user.alexa.alerts) user.alexa.alerts = {};
+  const prev = user.alexa.alerts[id];
+  const list = Array.isArray(prev) ? prev : prev ? [prev] : [];
+  list.push(token);
+  user.alexa.alerts[id] = list.slice(-12);
+}
+
 function safeSpeech(title) {
   return String(title || "aviso").replace(/[<>&]/g, " ").replace(/\s+/g, " ").trim().slice(0, 80) || "aviso";
 }
 
-async function createReminder(alexa, title) {
+async function createReminder(alexa, title, when) {
   const text = `Aviso de Kizen. ${safeSpeech(title)}. Sigue pendiente.`;
+  const trigger = when && when.at
+    ? {
+        type: "SCHEDULED_ABSOLUTE",
+        scheduledTime: formatLocal(when.at),
+        timeZoneId: TZ,
+      }
+    : {
+        type: "SCHEDULED_RELATIVE",
+        offsetInSeconds: Number((when && when.offsetSeconds) || RING_IN_SECONDS),
+      };
   const body = {
     requestTime: new Date().toISOString(),
-    trigger: {
-      type: "SCHEDULED_RELATIVE",
-      offsetInSeconds: RING_IN_SECONDS,
-    },
+    trigger,
     alertInfo: {
       spokenInfo: {
         content: [
@@ -113,9 +224,12 @@ async function createReminder(alexa, title) {
 }
 
 async function deleteAlert(user, id) {
-  const token = user.alexa?.alerts?.[id];
-  if (token && user.alexa?.access_token && user.alexa?.endpoint) {
-    await alexaFetch(user.alexa, `/v1/alerts/reminders/${encodeURIComponent(token)}`, { method: "DELETE" });
+  const raw = user.alexa?.alerts?.[id];
+  const tokens = Array.isArray(raw) ? raw : raw ? [raw] : [];
+  if (user.alexa?.access_token && user.alexa?.endpoint) {
+    for (const token of tokens) {
+      await alexaFetch(user.alexa, `/v1/alerts/reminders/${encodeURIComponent(token)}`, { method: "DELETE" });
+    }
   }
   if (user.alexa?.alerts) delete user.alexa.alerts[id];
 }

@@ -9,8 +9,6 @@ import com.kizen.tasks.sync.AlexaChimeClient
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -32,24 +30,21 @@ class DayNudgeReceiver : BroadcastReceiver() {
                 if (nudge.isDone) {
                     reminderScheduler.cancelNudge(nudgeId)
                     KizenNotifier.cancel(context, notifyId(nudgeId))
-                    alexaChime.cancelNudge(nudgeId, nudge.title)
+                    alexaChime.enqueueNudge(nudgeId, nudge.title, cancel = true)
                     return@launch
                 }
-                coroutineScope {
-                    val chime = async { alexaChime.chimeNudge(nudge.id, nudge.title) }
-                    val interval = nudge.intervalMinutes.coerceAtLeast(5)
-                    KizenNotifier.showNudge(
-                        context = context,
-                        nudgeId = nudge.id,
-                        title = "Aún pendiente: ${nudge.title}",
-                        body = "Te aviso cada $interval min hasta que lo marques como hecho.",
-                        notifyId = notifyId(nudge.id),
-                    )
-                    reminderScheduler.scheduleNudgeAt(nudge, nudgeFollowupMillis(nudge))
-                    keepAliveForSound = true
-                    AlarmPlayer.play(context, durationMs = 10_000L, pending = pending)
-                    runCatching { chime.await() }
-                }
+                val interval = nudge.intervalMinutes.coerceAtLeast(5)
+                alexaChime.enqueueNudge(nudge.id, nudge.title)
+                KizenNotifier.showNudge(
+                    context = context,
+                    nudgeId = nudge.id,
+                    title = "Aún pendiente: ${nudge.title}",
+                    body = "Te aviso cada $interval min hasta que lo marques como hecho.",
+                    notifyId = notifyId(nudge.id),
+                )
+                reminderScheduler.scheduleNudgeAt(nudge, nudgeFollowupMillis(nudge))
+                keepAliveForSound = true
+                AlarmPlayer.play(context, durationMs = 10_000L, pending = pending)
             } finally {
                 if (!keepAliveForSound) pending.finish()
             }

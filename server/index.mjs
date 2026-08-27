@@ -4,7 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHash, randomUUID } from "node:crypto";
 
-import { chimeNudge, clientSnapshot, rememberAlexa, silenceDoneNudges } from "./alexaReminders.mjs";
+import { alexaStatus, armPendingNudges, chimeNudge, clientSnapshot, rememberAlexa, silenceDoneNudges } from "./alexaReminders.mjs";
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 loadDotEnv(path.join(ROOT, ".env"));
@@ -198,6 +198,7 @@ async function alexa(user, body) {
   const userId = body.user_id;
   if (linked) save(userId, user);
   if (intent === "LINK_ALEXA") {
+    await armPendingNudges(user, userId, save).catch(() => {});
     return { speak: "Este Echo ya está enlazado con Kizen.", intent };
   }
   if (intent === "ADD_TASK" && title) {
@@ -352,7 +353,7 @@ http
     console.log(`${new Date().toISOString()} ${req.method} ${url.pathname}`);
     try {
       if (req.method === "GET" && url.pathname === "/health") {
-        return json(res, 200, { ok: true, gemini: Boolean(GEMINI) });
+        return json(res, 200, { ok: true, gemini: Boolean(GEMINI), alexa: alexaStatus(load(HOME_USER)) });
       }
       if (req.method === "GET" && url.pathname === "/api/v3/sync") {
         return json(res, 200, clientSnapshot(load(userId)));

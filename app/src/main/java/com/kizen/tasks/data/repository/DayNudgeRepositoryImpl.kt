@@ -72,7 +72,7 @@ class DayNudgeRepositoryImpl @Inject constructor(
         if (done) {
             reminderScheduler.cancelNudge(id)
             KizenNotifier.cancel(context, nudgeNotifyId(id))
-            alexaChime.cancelNudge(id)
+            alexaChime.enqueueNudge(id, cancel = true)
         } else {
             get(id)?.let { reminderScheduler.syncNudge(it) }
         }
@@ -83,7 +83,7 @@ class DayNudgeRepositoryImpl @Inject constructor(
     override suspend fun delete(id: String) {
         reminderScheduler.cancelNudge(id)
         KizenNotifier.cancel(context, nudgeNotifyId(id))
-        alexaChime.cancelNudge(id)
+        alexaChime.enqueueNudge(id, cancel = true)
         nudgeDao.delete(id)
         widgetRefresher.refresh()
         pushCloud()
