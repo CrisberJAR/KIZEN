@@ -142,6 +142,8 @@ fun ListScreen(
                                 viewModel.toggleDone(task)
                             },
                             onClick = { onOpenTask(task.id) },
+                            subtasks = state.subtasksByTask[task.id].orEmpty(),
+                            onToggleSubtask = viewModel::toggleSubtask,
                         )
                     }
                     if (state.done.isNotEmpty()) {
@@ -151,6 +153,8 @@ fun ListScreen(
                                 task = task,
                                 onToggle = { viewModel.toggleDone(task) },
                                 onClick = { onOpenTask(task.id) },
+                                subtasks = state.subtasksByTask[task.id].orEmpty(),
+                                onToggleSubtask = viewModel::toggleSubtask,
                             )
                         }
                     }

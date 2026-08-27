@@ -45,7 +45,9 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kizen.tasks.domain.model.RepeatDays
+import com.kizen.tasks.ui.components.PinWidgetButton
 import com.kizen.tasks.ui.components.SoftCard
+import com.kizen.tasks.widget.WidgetPin
 import com.kizen.tasks.ui.theme.CreamBg
 import com.kizen.tasks.ui.theme.CreamCard
 import com.kizen.tasks.ui.theme.KizenTypography
@@ -152,6 +154,33 @@ fun HabitEditorScreen(
             }
 
             SoftCard(modifier = Modifier.fillMaxWidth()) {
+                Text("Veces al día", style = KizenTypography.titleMedium)
+                Text(
+                    "Agua 5 veces, tender la cama 1, cepillarte 3. Siempre se queda aquí.",
+                    style = KizenTypography.bodyMedium,
+                    color = TextMute,
+                    modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
+                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    TextButton(onClick = { viewModel.onTimesPerDay(state.timesPerDay - 1) }) {
+                        Text("−", color = PinkDeep, style = KizenTypography.headlineSmall)
+                    }
+                    Text("${state.timesPerDay}", style = KizenTypography.headlineSmall)
+                    TextButton(onClick = { viewModel.onTimesPerDay(state.timesPerDay + 1) }) {
+                        Text("+", color = PinkDeep, style = KizenTypography.headlineSmall)
+                    }
+                    Text(
+                        if (state.timesPerDay == 1) "una vez al día" else "repeticiones hoy",
+                        style = KizenTypography.bodyMedium,
+                        color = TextMute,
+                    )
+                }
+            }
+
+            SoftCard(modifier = Modifier.fillMaxWidth()) {
                 Text("Se repite", style = KizenTypography.titleMedium)
                 Spacer(Modifier.height(8.dp))
                 Row(
@@ -225,6 +254,11 @@ fun HabitEditorScreen(
             }
 
             if (!state.isNew) {
+                PinWidgetButton(
+                    label = "Este hábito en el escritorio",
+                    onPin = { WidgetPin.pinHabit(context, state.id) },
+                    filled = true,
+                )
                 Button(
                     onClick = viewModel::delete,
                     modifier = Modifier.fillMaxWidth(),

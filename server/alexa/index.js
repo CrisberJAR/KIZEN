@@ -6,30 +6,28 @@ const { URL } = require("url");
 /**
  * Pega este archivo COMPLETO en Code → lambda/index.js y pulsa Save + Deploy.
  *
- * Cambia API_BASE por la URL HTTPS del túnel (Cloudflare), sin barra final.
- * Alexa no puede usar localhost. Localtunnel (loca.lt) suele devolver HTML
- * y Alexa lo trata como si hubiera guardado la tarea.
+ * KIZEN_API_BASE = https://kizen-api.onrender.com
+ * Alexa no puede usar localhost.
+ *
+ * En la consola: Build → Tools → Permissions → activa Reminders.
  */
-const API_BASE = (process.env.KIZEN_API_BASE || "https://CAMBIA-ESTA-URL.trycloudflare.com").replace(/\/$/, "");
+const API_BASE = (process.env.KIZEN_API_BASE || "https://kizen-api.onrender.com").replace(/\/$/, "");
 const HOME_USER = (process.env.KIZEN_USER_ID || process.env.KIZEN_HOME_USER || "kizen-casa").trim() || "kizen-casa";
+const REMINDERS_SCOPE = "alexa::alerts:reminders:skill:readwrite";
 
 const INTENT_MAP = {
   AddTaskIntent: "ADD_TASK",
-  AddTaskIntent: "ADD_TASK",
-  CompleteTaskIntent: "COMPLETE_TASK",
   CompleteTaskIntent: "COMPLETE_TASK",
   ListTasksIntent: "LIST_TASKS",
-  ListTasksIntent: "LIST_TASKS",
-  AddToListIntent: "ADD_TO_LIST",
   AddToListIntent: "ADD_TO_LIST",
   AddHabitIntent: "ADD_HABIT",
-  AddHabitIntent: "ADD_HABIT",
   CompleteHabitIntent: "COMPLETE_HABIT",
-  CompleteHabitIntent: "COMPLETE_HABIT",
-  ListHabitsIntent: "LIST_HABITS",
   ListHabitsIntent: "LIST_HABITS",
   StreakIntent: "STREAK",
   InsightsIntent: "INSIGHTS",
+  AddNudgeIntent: "ADD_NUDGE",
+  CompleteNudgeIntent: "COMPLETE_NUDGE",
+  ListNudgesIntent: "LIST_NUDGES",
 };
 
 function slot(handlerInput, name) {
@@ -41,9 +39,28 @@ function titleFrom(handlerInput) {
   return (
     slot(handlerInput, "title") ||
     slot(handlerInput, "habit") ||
+    slot(handlerInput, "nudge") ||
     slot(handlerInput, "task") ||
     ""
   );
+}
+
+function hasRemindersPermission(envelope) {
+  const permissions = envelope.context?.System?.user?.permissions;
+  if (!permissions) return false;
+  const scope = permissions.scopes?.[REMINDERS_SCOPE];
+  const status = String(scope?.status || "").toUpperCase();
+  if (status === "GRANTED") return true;
+  return Boolean(permissions.consentToken);
+}
+
+function alexaLink(handlerInput) {
+  const system = handlerInput.requestEnvelope.context?.System || {};
+  return {
+    api_endpoint: system.apiEndpoint || "https://api.amazonalexa.com",
+    api_access_token: system.apiAccessToken || "",
+    has_reminders: hasRemindersPermission(handlerInput.requestEnvelope),
+  };
 }
 
 function postJson(pathname, body) {
@@ -108,12 +125,16 @@ async function sendToKizen(handlerInput, intent, extra = {}) {
     Alexa.getRequestType(handlerInput.requestEnvelope) === "IntentRequest"
       ? handlerInput.requestEnvelope.request.intent.name
       : Alexa.getRequestType(handlerInput.requestEnvelope);
+  const link = alexaLink(handlerInput);
 
   const body = {
     user_id: HOME_USER,
     alexa_account: userId,
     intent,
     utterance: extra.utterance || title || utterance,
+    api_endpoint: link.api_endpoint,
+    api_access_token: link.api_access_token,
+    has_reminders: link.has_reminders,
     task: title
       ? {
           id: extra.taskId || `alexa-${Date.now()}`,
@@ -147,14 +168,32 @@ function speakAndListen(handlerInput, text) {
   return handlerInput.responseBuilder.speak(text).reprompt("¿Qué más hacemos?").getResponse();
 }
 
+function askRemindersPermission(handlerInput, text) {
+  return handlerInput.responseBuilder
+    .speak(text)
+    .withAskForPermissionsConsentCard([REMINDERS_SCOPE])
+    .getResponse();
+}
+
 const LaunchRequestHandler = {
   canHandle(handlerInput) {
     return Alexa.getRequestType(handlerInput.requestEnvelope) === "LaunchRequest";
   },
-  handle(handlerInput) {
+  async handle(handlerInput) {
+    try {
+      await sendToKizen(handlerInput, "LINK_ALEXA");
+    } catch (error) {
+      console.error("Kizen link error", error);
+    }
+    if (!hasRemindersPermission(handlerInput.requestEnvelope)) {
+      return askRemindersPermission(
+        handlerInput,
+        "Para que este Echo suene solo con tus avisos de Kizen, acepta el permiso de recordatorios en la app de Alexa.",
+      );
+    }
     return speakAndListen(
       handlerInput,
-      "Hola, soy tu asistente Jarvis. Puedes agregar una tarea, marcar un hábito o preguntarme cómo vas.",
+      "Hola, soy tu asistente Jarvis. Puedes agregar una tarea, un aviso de hoy, marcar un hábito o preguntarme cómo vas.",
     );
   },
 };
@@ -169,6 +208,15 @@ const KizenIntentHandler = {
     const intent = INTENT_MAP[alexaIntent];
     try {
       const text = await sendToKizen(handlerInput, intent);
+      if (
+        (intent === "ADD_NUDGE" || intent === "LINK_ALEXA") &&
+        !hasRemindersPermission(handlerInput.requestEnvelope)
+      ) {
+        return askRemindersPermission(
+          handlerInput,
+          `${text} Para que el Echo suene solo, acepta el permiso de recordatorios en la app de Alexa.`,
+        );
+      }
       return speakAndListen(handlerInput, text);
     } catch (error) {
       console.error("Kizen API error", error);
@@ -190,7 +238,7 @@ const HelpIntentHandler = {
   handle(handlerInput) {
     return speakAndListen(
       handlerInput,
-      "Prueba: agrégame comprar leche, completa el hábito de agua, o cómo voy hoy.",
+      "Prueba: agrégame comprar leche, avísame tomar agua, completa el hábito de agua, o cómo voy hoy.",
     );
   },
 };
@@ -217,7 +265,7 @@ const FallbackHandler = {
     );
   },
   handle(handlerInput) {
-    return speakAndListen(handlerInput, "No te seguí. Dime una tarea o un hábito.");
+    return speakAndListen(handlerInput, "No te seguí. Dime una tarea, un hábito o un aviso de hoy.");
   },
 };
 

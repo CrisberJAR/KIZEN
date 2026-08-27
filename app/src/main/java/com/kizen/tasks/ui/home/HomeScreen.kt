@@ -50,18 +50,22 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kizen.tasks.domain.model.TaskList
+import com.kizen.tasks.notification.AlarmPermissions
 import com.kizen.tasks.ui.components.CelebrationOverlay
 import com.kizen.tasks.ui.components.EmptyState
 import com.kizen.tasks.ui.components.HabitCard
 import com.kizen.tasks.ui.components.Nubi
 import com.kizen.tasks.ui.components.NubiMood
+import com.kizen.tasks.ui.components.NudgeCard
 import com.kizen.tasks.ui.components.SoftCard
 import com.kizen.tasks.ui.components.TaskCard
+import com.kizen.tasks.ui.components.WidgetPinRow
 import com.kizen.tasks.ui.theme.CreamBg
 import com.kizen.tasks.ui.theme.CreamYellow
 import com.kizen.tasks.ui.theme.KizenTypography
@@ -83,10 +87,13 @@ fun HomeScreen(
     onOpenSettings: () -> Unit,
     onOpenHabit: (String) -> Unit,
     onCreateHabit: () -> Unit,
+    onOpenNudge: (String) -> Unit,
+    onCreateNudge: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val haptic = LocalHapticFeedback.current
+    val context = LocalContext.current
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
 
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -99,12 +106,16 @@ fun HomeScreen(
     }
 
     LaunchedEffect(Unit) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        AlarmPermissions.ensureAlarmChannel(context)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            !AlarmPermissions.notificationsAllowed(context)
+        ) {
             permission.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
+        AlarmPermissions.requestExactAlarmsOnce(context)
     }
 
-    val empty = state.active.isEmpty() && state.done.isEmpty() && state.habits.isEmpty()
+    val empty = state.active.isEmpty() && state.done.isEmpty() && state.habits.isEmpty() && state.nudges.isEmpty()
 
     Box(Modifier.fillMaxSize()) {
         Scaffold(
@@ -149,6 +160,18 @@ fun HomeScreen(
                 }
                 item {
                     TodayHero(progress = state.progress, done = state.doneCount, total = state.total)
+                }
+                item {
+                    SoftCard(modifier = Modifier.fillMaxWidth()) {
+                        Text("En tu escritorio", style = KizenTypography.titleMedium)
+                        Text(
+                            "Toca y confirma. Así ves hábitos o tareas al desbloquear, sin buscar widgets.",
+                            style = KizenTypography.bodyMedium,
+                            color = TextMute,
+                            modifier = Modifier.padding(top = 4.dp, bottom = 4.dp),
+                        )
+                        WidgetPinRow()
+                    }
                 }
                 if (state.insight.isNotBlank()) {
                     item {
@@ -199,11 +222,43 @@ fun HomeScreen(
                     items(state.habits, key = { it.id }) { habit ->
                         HabitCard(
                             habit = habit,
-                            onToggle = {
+                            onBump = { delta ->
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                viewModel.toggleHabit(habit)
+                                viewModel.bumpHabit(habit, delta)
                             },
                             onClick = { onOpenHabit(habit.id) },
+                        )
+                    }
+                }
+                item {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                        Text("Avisos de hoy", style = KizenTypography.titleMedium, modifier = Modifier.weight(1f))
+                        IconButton(onClick = onCreateNudge) {
+                            Icon(Icons.Rounded.Add, contentDescription = "Nuevo aviso", tint = PinkDeep)
+                        }
+                    }
+                }
+                if (state.nudges.isEmpty()) {
+                    item {
+                        SoftCard(color = Lavender.copy(alpha = 0.35f), modifier = Modifier.fillMaxWidth()) {
+                            Text("Hoy no hay avisos", style = KizenTypography.titleMedium)
+                            Text(
+                                "Sirven para algo de este día: te avisan desde una hora, una y otra vez, hasta que lo marques.",
+                                style = KizenTypography.bodyMedium,
+                                color = TextMute,
+                                modifier = Modifier.padding(top = 4.dp),
+                            )
+                        }
+                    }
+                } else {
+                    items(state.nudges, key = { "nudge-${it.id}" }) { nudge ->
+                        NudgeCard(
+                            nudge = nudge,
+                            onToggle = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                viewModel.toggleNudge(nudge)
+                            },
+                            onClick = { onOpenNudge(nudge.id) },
                         )
                     }
                 }
@@ -226,6 +281,8 @@ fun HomeScreen(
                                     viewModel.toggleDone(task)
                                 },
                                 onClick = { onOpenTask(task.id) },
+                                subtasks = state.subtasksByTask[task.id].orEmpty(),
+                                onToggleSubtask = viewModel::toggleSubtask,
                             )
                         }
                     }
@@ -242,6 +299,8 @@ fun HomeScreen(
                                 task = task,
                                 onToggle = { viewModel.toggleDone(task) },
                                 onClick = { onOpenTask(task.id) },
+                                subtasks = state.subtasksByTask[task.id].orEmpty(),
+                                onToggleSubtask = viewModel::toggleSubtask,
                             )
                         }
                     }
@@ -289,8 +348,8 @@ private fun TodayHero(progress: Float, done: Int, total: Int) {
             Column {
                 Text("Hoy se siente ligero", style = KizenTypography.titleLarge)
                 Text(
-                    if (total == 0) "Sin prisa. Un hábito o una tarea, cuando quieras."
-                    else "$done de $total listos entre hábitos y tareas",
+                    if (total == 0) "Sin prisa. Un hábito, un aviso o una tarea, cuando quieras."
+                    else "$done de $total listos entre hábitos, avisos y tareas",
                     style = KizenTypography.bodyMedium,
                     color = TextMute,
                     modifier = Modifier.padding(top = 4.dp),

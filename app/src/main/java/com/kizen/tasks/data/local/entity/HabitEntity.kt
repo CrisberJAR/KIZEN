@@ -16,6 +16,7 @@ data class HabitEntity(
     val colorHex: String,
     val repeatDaysMask: Int,
     val reminderMinutes: Int?,
+    val timesPerDay: Int = 1,
     val isActive: Boolean,
     val currentStreak: Int,
     val longestStreak: Int,

@@ -21,6 +21,7 @@ import javax.inject.Inject
 
 data class EditorUiState(
     val isNew: Boolean = true,
+    val id: String = "",
     val title: String = "",
     val notes: String = "",
     val listId: String = "",
@@ -31,6 +32,7 @@ data class EditorUiState(
     val lists: List<TaskList> = emptyList(),
     val saved: Boolean = false,
     val deleted: Boolean = false,
+    val alarmArmed: Boolean = false,
     val draftSubtask: String = "",
 )
 
@@ -47,7 +49,7 @@ class TaskEditorViewModel @Inject constructor(
     private val isNew = existingId == null
 
     private val form = MutableStateFlow(
-        EditorUiState(isNew = isNew, listId = presetListId.orEmpty()),
+        EditorUiState(isNew = isNew, id = taskId, listId = presetListId.orEmpty()),
     )
 
     val uiState = combine(
@@ -56,6 +58,7 @@ class TaskEditorViewModel @Inject constructor(
         taskRepository.observeSubtasks(taskId),
     ) { editor, lists, storedSubtasks ->
         editor.copy(
+            id = taskId,
             lists = lists,
             listId = editor.listId.ifBlank { lists.firstOrNull()?.id.orEmpty() },
             subtasks = if (isNew) editor.subtasks else storedSubtasks,
@@ -84,7 +87,7 @@ class TaskEditorViewModel @Inject constructor(
     fun onNotes(value: String) = form.update { it.copy(notes = value) }
     fun onList(id: String) = form.update { it.copy(listId = id) }
     fun onPriority(priority: Priority) = form.update { it.copy(priority = priority) }
-    fun onDue(value: Long?) = form.update { it.copy(dueAt = value) }
+    fun onDue(value: Long?) = form.update { it.copy(dueAt = value, reminderAt = value) }
     fun onReminder(value: Long?) = form.update { it.copy(reminderAt = value) }
     fun onDraftSubtask(value: String) = form.update { it.copy(draftSubtask = value) }
 
@@ -142,6 +145,7 @@ class TaskEditorViewModel @Inject constructor(
         viewModelScope.launch {
             val now = System.currentTimeMillis()
             val previous = if (isNew) null else taskRepository.getTask(taskId)
+            val reminderAt = state.reminderAt ?: state.dueAt
             taskRepository.upsert(
                 Task(
                     id = taskId,
@@ -151,7 +155,7 @@ class TaskEditorViewModel @Inject constructor(
                     priority = state.priority,
                     isDone = previous?.isDone ?: false,
                     dueAt = state.dueAt,
-                    reminderAt = state.reminderAt,
+                    reminderAt = reminderAt,
                     completedAt = previous?.completedAt,
                     createdAt = previous?.createdAt ?: now,
                     updatedAt = now,
@@ -161,7 +165,8 @@ class TaskEditorViewModel @Inject constructor(
             if (isNew) {
                 state.subtasks.forEach { taskRepository.upsertSubtask(it.copy(taskId = taskId)) }
             }
-            form.update { it.copy(saved = true) }
+            val armed = reminderAt != null && reminderAt > now
+            form.update { it.copy(saved = true, alarmArmed = armed) }
         }
     }
 

@@ -89,6 +89,45 @@
           ]
         },
         {
+          "name": "AddNudgeIntent",
+          "slots": [{ "name": "title", "type": "AMAZON.SearchQuery" }],
+          "samples": [
+            "avísame {title}",
+            "avisame {title}",
+            "crea un aviso {title}",
+            "crea el aviso {title}",
+            "agrega el aviso {title}",
+            "agrega un aviso {title}",
+            "pon un aviso {title}",
+            "aviso de hoy {title}",
+            "recuérdame hoy {title}"
+          ]
+        },
+        {
+          "name": "CompleteNudgeIntent",
+          "slots": [{ "name": "title", "type": "AMAZON.SearchQuery" }],
+          "samples": [
+            "ya hice el aviso {title}",
+            "completa el aviso {title}",
+            "marca el aviso {title}",
+            "marca el aviso {title} como hecho",
+            "ya no me avises de {title}",
+            "terminé el aviso {title}"
+          ]
+        },
+        {
+          "name": "ListNudgesIntent",
+          "slots": [],
+          "samples": [
+            "avisos de hoy",
+            "qué avisos tengo",
+            "lista mis avisos",
+            "cuáles son mis avisos",
+            "cuales son mis avisos",
+            "qué avisos de hoy tengo"
+          ]
+        },
+        {
           "name": "InsightsIntent",
           "slots": [],
           "samples": [

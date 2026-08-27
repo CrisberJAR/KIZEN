@@ -24,5 +24,6 @@ data class HabitLogEntity(
     @PrimaryKey val id: String,
     val habitId: String,
     val dayEpoch: Long,
+    val count: Int = 1,
     val completedAt: Long,
 )

@@ -20,4 +20,7 @@ interface KizenApi {
 
     @POST("api/v3/alexa/events")
     suspend fun alexaEvent(@Body event: AlexaTaskEvent): AlexaSpeakDto
+
+    @POST("api/v3/alexa/chime")
+    suspend fun alexaChime(@Body body: AlexaChimeDto): AlexaChimeResultDto
 }

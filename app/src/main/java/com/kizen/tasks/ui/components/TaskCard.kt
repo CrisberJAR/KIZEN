@@ -32,6 +32,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.kizen.tasks.domain.model.Priority
+import com.kizen.tasks.domain.model.Subtask
 import com.kizen.tasks.domain.model.Task
 import com.kizen.tasks.ui.theme.CreamCard
 import com.kizen.tasks.ui.theme.KizenTypography
@@ -47,10 +48,13 @@ fun TaskCard(
     onToggle: () -> Unit,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    subtasks: List<Subtask> = emptyList(),
+    onToggleSubtask: ((Subtask) -> Unit)? = null,
 ) {
     val scale by animateFloatAsState(if (task.isDone) 0.98f else 1f, label = "scale")
     val titleColor by animateColorAsState(if (task.isDone) TextMute else TextMain, label = "title")
     val bar = parseHexColor(task.priority.colorHex)
+    val shown = subtasks.take(8)
 
     Row(
         modifier = modifier
@@ -59,43 +63,91 @@ fun TaskCard(
             .clip(RoundedCornerShape(24.dp))
             .background(CreamCard)
             .clickable(onClick = onClick)
-            .height(88.dp)
+            .then(if (shown.isEmpty()) Modifier.height(88.dp) else Modifier)
             .fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
             Modifier
                 .width(8.dp)
-                .fillMaxHeight()
-                .background(bar),
-        )
-        CuteCheckbox(
-            checked = task.isDone,
-            color = bar,
-            onChecked = onToggle,
-            modifier = Modifier.padding(start = 12.dp),
+                .then(if (shown.isEmpty()) Modifier.fillMaxHeight() else Modifier.height(88.dp))
+                .background(bar)
+                .align(Alignment.Top),
         )
         Column(
             modifier = Modifier
                 .weight(1f)
-                .padding(horizontal = 10.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+                .padding(bottom = if (shown.isEmpty()) 0.dp else 10.dp),
         ) {
-            Text(
-                task.title,
-                style = KizenTypography.titleMedium,
-                color = titleColor,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                textDecoration = if (task.isDone) TextDecoration.LineThrough else null,
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                SoftChip("${task.listEmoji} ${task.listName}", parseHexColor(task.listColorHex))
-                if (task.dueAt != null) {
-                    SoftChip(formatTime(task.dueAt), parseHexColor(Priority.MEDIUM.colorHex))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(top = 12.dp, end = 10.dp),
+            ) {
+                CuteCheckbox(
+                    checked = task.isDone,
+                    color = bar,
+                    onChecked = onToggle,
+                    modifier = Modifier.padding(start = 12.dp),
+                )
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(horizontal = 10.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Text(
+                        task.title,
+                        style = KizenTypography.titleMedium,
+                        color = titleColor,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        textDecoration = if (task.isDone) TextDecoration.LineThrough else null,
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        SoftChip("${task.listEmoji} ${task.listName}", parseHexColor(task.listColorHex))
+                        if (task.dueAt != null) {
+                            SoftChip(formatTime(task.dueAt), parseHexColor(Priority.MEDIUM.colorHex))
+                        }
+                        if (task.subtaskTotal > 0) {
+                            SoftChip("lista ${task.subtaskDone}/${task.subtaskTotal}", Mint)
+                        }
+                    }
                 }
-                if (task.subtaskTotal > 0) {
-                    SoftChip("${task.subtaskDone}/${task.subtaskTotal}", Mint)
+            }
+            if (shown.isNotEmpty() && onToggleSubtask != null) {
+                Column(
+                    modifier = Modifier.padding(start = 20.dp, end = 14.dp, top = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    shown.forEach { item ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            CuteCheckbox(
+                                checked = item.isDone,
+                                color = Mint,
+                                onChecked = { onToggleSubtask(item) },
+                            )
+                            Text(
+                                item.title,
+                                style = KizenTypography.bodyMedium,
+                                color = if (item.isDone) TextMute else TextMain,
+                                textDecoration = if (item.isDone) TextDecoration.LineThrough else null,
+                                modifier = Modifier.padding(start = 8.dp),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                    if (subtasks.size > shown.size) {
+                        Text(
+                            "y ${subtasks.size - shown.size} más…",
+                            style = KizenTypography.bodyMedium,
+                            color = TextMute,
+                            modifier = Modifier.padding(start = 36.dp),
+                        )
+                    }
                 }
             }
         }

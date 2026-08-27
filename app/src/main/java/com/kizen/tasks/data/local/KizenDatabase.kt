@@ -2,13 +2,17 @@ package com.kizen.tasks.data.local
 
 import androidx.room.Database
 import androidx.room.RoomDatabase
+import com.kizen.tasks.data.local.dao.DayNudgeDao
 import com.kizen.tasks.data.local.dao.HabitDao
 import com.kizen.tasks.data.local.dao.HabitLogDao
+import com.kizen.tasks.data.local.dao.NudgeItemDao
 import com.kizen.tasks.data.local.dao.SubtaskDao
 import com.kizen.tasks.data.local.dao.TaskDao
 import com.kizen.tasks.data.local.dao.TaskListDao
+import com.kizen.tasks.data.local.entity.DayNudgeEntity
 import com.kizen.tasks.data.local.entity.HabitEntity
 import com.kizen.tasks.data.local.entity.HabitLogEntity
+import com.kizen.tasks.data.local.entity.NudgeItemEntity
 import com.kizen.tasks.data.local.entity.SubtaskEntity
 import com.kizen.tasks.data.local.entity.TaskEntity
 import com.kizen.tasks.data.local.entity.TaskListEntity
@@ -20,8 +24,10 @@ import com.kizen.tasks.data.local.entity.TaskListEntity
         SubtaskEntity::class,
         HabitEntity::class,
         HabitLogEntity::class,
+        DayNudgeEntity::class,
+        NudgeItemEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = false,
 )
 abstract class KizenDatabase : RoomDatabase() {
@@ -30,4 +36,6 @@ abstract class KizenDatabase : RoomDatabase() {
     abstract fun subtaskDao(): SubtaskDao
     abstract fun habitDao(): HabitDao
     abstract fun habitLogDao(): HabitLogDao
+    abstract fun dayNudgeDao(): DayNudgeDao
+    abstract fun nudgeItemDao(): NudgeItemDao
 }

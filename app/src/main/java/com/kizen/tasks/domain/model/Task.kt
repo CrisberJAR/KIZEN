@@ -18,4 +18,10 @@ data class Task(
     val listName: String = "",
     val listEmoji: String = "",
     val listColorHex: String = "#C7CEEA",
-)
+) {
+    fun alarmAt(now: Long = System.currentTimeMillis()): Long? {
+        if (isDone) return null
+        val at = reminderAt ?: dueAt ?: return null
+        return at.takeIf { it > now }
+    }
+}

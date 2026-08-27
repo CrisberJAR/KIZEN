@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kizen.tasks.domain.model.Priority
+import com.kizen.tasks.domain.model.Subtask
 import com.kizen.tasks.domain.model.Task
 import com.kizen.tasks.domain.model.TaskList
 import com.kizen.tasks.domain.repository.ListRepository
@@ -21,6 +22,7 @@ data class ListUiState(
     val list: TaskList? = null,
     val active: List<Task> = emptyList(),
     val done: List<Task> = emptyList(),
+    val subtasksByTask: Map<String, List<Subtask>> = emptyMap(),
     val celebration: String? = null,
     val draft: String = "",
 )
@@ -39,13 +41,15 @@ class ListViewModel @Inject constructor(
     val uiState = combine(
         listRepository.observeLists(),
         taskRepository.observeByList(listId),
+        taskRepository.observeAllSubtasks(),
         draft,
         celebration,
-    ) { lists, tasks, text, cheer ->
+    ) { lists, tasks, subtasks, text, cheer ->
         ListUiState(
             list = lists.find { it.id == listId },
             active = tasks.filter { !it.isDone },
             done = tasks.filter { it.isDone },
+            subtasksByTask = subtasks.groupBy { it.taskId },
             celebration = cheer,
             draft = text,
         )
@@ -84,6 +88,12 @@ class ListViewModel @Inject constructor(
             val completing = !task.isDone
             taskRepository.setDone(task.id, completing)
             celebration.value = if (completing) "¡Una menos! “${task.title}”" else null
+        }
+    }
+
+    fun toggleSubtask(subtask: Subtask) {
+        viewModelScope.launch {
+            taskRepository.setSubtaskDone(subtask.id, !subtask.isDone)
         }
     }
 

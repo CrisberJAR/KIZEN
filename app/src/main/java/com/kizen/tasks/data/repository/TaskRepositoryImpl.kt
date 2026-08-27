@@ -8,6 +8,7 @@ import com.kizen.tasks.domain.model.Subtask
 import com.kizen.tasks.domain.model.Task
 import com.kizen.tasks.domain.repository.TaskRepository
 import com.kizen.tasks.notification.ReminderScheduler
+import com.kizen.tasks.widget.WidgetRefresher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -21,6 +22,7 @@ class TaskRepositoryImpl @Inject constructor(
     private val taskDao: TaskDao,
     private val subtaskDao: SubtaskDao,
     private val reminderScheduler: ReminderScheduler,
+    private val widgetRefresher: WidgetRefresher,
 ) : TaskRepository {
 
     override fun observeToday(): Flow<List<Task>> {
@@ -43,11 +45,15 @@ class TaskRepositoryImpl @Inject constructor(
     override fun observeSubtasks(taskId: String): Flow<List<Subtask>> =
         subtaskDao.observeByTask(taskId).map { rows -> rows.map { it.toDomain() } }
 
+    override fun observeAllSubtasks(): Flow<List<Subtask>> =
+        subtaskDao.observeAll().map { rows -> rows.map { it.toDomain() } }
+
     override suspend fun getTask(id: String): Task? = taskDao.getById(id)?.toDomain()
 
     override suspend fun upsert(task: Task) {
         taskDao.upsert(task.toEntity())
         reminderScheduler.sync(task)
+        widgetRefresher.refresh()
     }
 
     override suspend fun setDone(id: String, done: Boolean) {
@@ -55,19 +61,23 @@ class TaskRepositoryImpl @Inject constructor(
         taskDao.setDone(id, done, if (done) now else null, now)
         val task = taskDao.getById(id)?.toDomain()
         if (task != null) reminderScheduler.sync(task)
+        widgetRefresher.refresh()
     }
 
     override suspend fun delete(id: String) {
         reminderScheduler.cancel(id)
         taskDao.delete(id)
+        widgetRefresher.refresh()
     }
 
     override suspend fun upsertSubtask(subtask: Subtask) {
         subtaskDao.upsert(subtask.toEntity())
+        widgetRefresher.refresh()
     }
 
     override suspend fun setSubtaskDone(id: String, done: Boolean) {
         subtaskDao.setDone(id, done, System.currentTimeMillis())
+        widgetRefresher.refresh()
     }
 
     override suspend fun deleteSubtask(id: String) {

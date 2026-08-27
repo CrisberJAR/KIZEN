@@ -12,13 +12,16 @@ interface HabitDao {
     @Query(
         """
         SELECT h.*,
-            EXISTS(
-                SELECT 1 FROM habit_logs l
+            COALESCE((
+                SELECT l.count FROM habit_logs l
                 WHERE l.habitId = h.id AND l.dayEpoch = :todayEpoch
-            ) AS doneToday
+            ), 0) AS doneCount
         FROM habits h
         WHERE h.isActive = 1 AND (h.repeatDaysMask & :todayBit) != 0
-        ORDER BY doneToday ASC, h.createdAt ASC
+        ORDER BY (COALESCE((
+                SELECT l.count FROM habit_logs l
+                WHERE l.habitId = h.id AND l.dayEpoch = :todayEpoch
+            ), 0) >= h.timesPerDay) ASC, h.createdAt ASC
         """,
     )
     fun observeToday(todayEpoch: Long, todayBit: Int): Flow<List<HabitWithToday>>
@@ -26,13 +29,13 @@ interface HabitDao {
     @Query(
         """
         SELECT h.*,
-            EXISTS(
-                SELECT 1 FROM habit_logs l
+            COALESCE((
+                SELECT l.count FROM habit_logs l
                 WHERE l.habitId = h.id AND l.dayEpoch = :todayEpoch
-            ) AS doneToday
+            ), 0) AS doneCount
         FROM habits h
         WHERE h.isActive = 1 AND (h.repeatDaysMask & :todayBit) != 0
-        ORDER BY doneToday ASC, h.createdAt ASC
+        ORDER BY h.createdAt ASC
         """,
     )
     suspend fun today(todayEpoch: Long, todayBit: Int): List<HabitWithToday>
@@ -40,10 +43,10 @@ interface HabitDao {
     @Query(
         """
         SELECT h.*,
-            EXISTS(
-                SELECT 1 FROM habit_logs l
+            COALESCE((
+                SELECT l.count FROM habit_logs l
                 WHERE l.habitId = h.id AND l.dayEpoch = :todayEpoch
-            ) AS doneToday
+            ), 0) AS doneCount
         FROM habits h
         ORDER BY h.createdAt ASC
         """,
@@ -83,5 +86,5 @@ interface HabitDao {
 
 data class HabitWithToday(
     @Embedded val habit: HabitEntity,
-    val doneToday: Boolean,
+    val doneCount: Int,
 )

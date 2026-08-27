@@ -3,4 +3,21 @@
     <string name="app_name">Kizen</string>
     <string name="channel_reminders">Recordatorios</string>
     <string name="channel_reminders_desc">Avisos de tus tareas en Kizen</string>
+    <string name="channel_alarms">Alarmas de tareas</string>
+    <string name="channel_alarms_desc">Suena fuerte aunque el teléfono esté bloqueado</string>
+    <string name="channel_nudges">Avisos del día</string>
+    <string name="channel_nudges_desc">Suena como alarma hasta que marques el aviso como hecho</string>
+    <string name="nudge_done_action">Ya lo hice</string>
+    <string name="widget_today">Kizen · hoy</string>
+    <string name="widget_today_desc">Resumen de hábitos, tareas y avisos</string>
+    <string name="widget_habits">Kizen · hábitos</string>
+    <string name="widget_habits_desc">Tus hábitos de hoy. Toca uno para sumar una vez</string>
+    <string name="widget_tasks">Kizen · tareas</string>
+    <string name="widget_tasks_desc">Tareas pendientes de hoy</string>
+    <string name="widget_nudges">Kizen · avisos</string>
+    <string name="widget_nudges_desc">Avisos de hoy que aún no marcas</string>
+    <string name="widget_one_habit">Kizen · un hábito</string>
+    <string name="widget_one_habit_desc">Un hábito concreto. Toca para sumar</string>
+    <string name="widget_one_task">Kizen · una tarea</string>
+    <string name="widget_one_task_desc">Una tarea concreta. Toca para marcarla</string>
 </resources>

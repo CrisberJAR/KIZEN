@@ -12,8 +12,14 @@ interface HabitLogDao {
     @Query("SELECT * FROM habit_logs WHERE habitId = :habitId AND dayEpoch = :dayEpoch LIMIT 1")
     suspend fun forDay(habitId: String, dayEpoch: Long): HabitLogEntity?
 
-    @Query("SELECT dayEpoch FROM habit_logs WHERE habitId = :habitId")
-    suspend fun daysFor(habitId: String): List<Long>
+    @Query(
+        """
+        SELECT l.dayEpoch FROM habit_logs l
+        INNER JOIN habits h ON h.id = l.habitId
+        WHERE l.habitId = :habitId AND l.count >= h.timesPerDay
+        """,
+    )
+    suspend fun completeDaysFor(habitId: String): List<Long>
 
     @Query("SELECT * FROM habit_logs")
     suspend fun all(): List<HabitLogEntity>

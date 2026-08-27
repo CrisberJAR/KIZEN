@@ -2,6 +2,7 @@ package com.kizen.tasks.ui.task
 
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -47,7 +48,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kizen.tasks.domain.model.Priority
 import com.kizen.tasks.ui.components.CuteCheckbox
+import com.kizen.tasks.ui.components.PinWidgetButton
 import com.kizen.tasks.ui.components.SoftCard
+import com.kizen.tasks.widget.WidgetPin
 import com.kizen.tasks.ui.theme.CreamBg
 import com.kizen.tasks.ui.theme.CreamCard
 import com.kizen.tasks.ui.theme.KizenTypography
@@ -70,7 +73,14 @@ fun TaskEditorScreen(
     val context = LocalContext.current
 
     LaunchedEffect(state.saved, state.deleted) {
-        if (state.saved || state.deleted) onBack()
+        if (state.saved) {
+            if (state.alarmArmed) {
+                Toast.makeText(context, "Alarma programada", Toast.LENGTH_SHORT).show()
+            }
+            onBack()
+        } else if (state.deleted) {
+            onBack()
+        }
     }
 
     Scaffold(
@@ -219,13 +229,13 @@ fun TaskEditorScreen(
             }
 
             SoftCard(modifier = Modifier.fillMaxWidth()) {
-                Text("Notas", style = KizenTypography.titleMedium)
+                Text("Descripción o nota", style = KizenTypography.titleMedium)
                 Spacer(Modifier.height(8.dp))
                 OutlinedTextField(
                     value = state.notes,
                     onValueChange = viewModel::onNotes,
                     modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("Detalles, enlaces, un suspiro…") },
+                    placeholder = { Text("Detalles, enlace, qué llevar a la tienda…") },
                     minLines = 3,
                     shape = RoundedCornerShape(20.dp),
                     colors = fieldColors(),
@@ -233,8 +243,13 @@ fun TaskEditorScreen(
             }
 
             SoftCard(modifier = Modifier.fillMaxWidth()) {
-                Text("Pasitos", style = KizenTypography.titleMedium)
-                Spacer(Modifier.height(8.dp))
+                Text("Lista dentro", style = KizenTypography.titleMedium)
+                Text(
+                    "Compras, cosas que adjuntar o pasos de esta tarea.",
+                    style = KizenTypography.bodyMedium,
+                    color = TextMute,
+                    modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
+                )
                 state.subtasks.forEach { subtask ->
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -264,7 +279,7 @@ fun TaskEditorScreen(
                         value = state.draftSubtask,
                         onValueChange = viewModel::onDraftSubtask,
                         modifier = Modifier.weight(1f),
-                        placeholder = { Text("Un paso pequeño") },
+                        placeholder = { Text("Pan, leche, factura del producto…") },
                         singleLine = true,
                         shape = RoundedCornerShape(22.dp),
                         colors = fieldColors(),
@@ -282,6 +297,11 @@ fun TaskEditorScreen(
             }
 
             if (!state.isNew) {
+                PinWidgetButton(
+                    label = "Esta tarea en el escritorio",
+                    onPin = { WidgetPin.pinTask(context, state.id) },
+                    filled = true,
+                )
                 Button(
                     onClick = viewModel::delete,
                     modifier = Modifier.fillMaxWidth(),

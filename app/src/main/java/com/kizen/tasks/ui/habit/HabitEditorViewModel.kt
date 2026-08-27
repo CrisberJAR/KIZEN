@@ -17,12 +17,14 @@ import javax.inject.Inject
 
 data class HabitEditorUiState(
     val isNew: Boolean = true,
+    val id: String = "",
     val title: String = "",
     val notes: String = "",
     val emoji: String = "💧",
     val colorHex: String = "#A8D8EA",
     val repeatDays: Set<DayOfWeek> = DayOfWeek.entries.toSet(),
     val reminderMinutes: Int? = 9 * 60,
+    val timesPerDay: Int = 1,
     val saved: Boolean = false,
     val deleted: Boolean = false,
 )
@@ -37,7 +39,7 @@ class HabitEditorViewModel @Inject constructor(
     private val habitId = existingId ?: UUID.randomUUID().toString()
     private val isNew = existingId == null
 
-    private val _uiState = MutableStateFlow(HabitEditorUiState(isNew = isNew))
+    private val _uiState = MutableStateFlow(HabitEditorUiState(isNew = isNew, id = habitId))
     val uiState: StateFlow<HabitEditorUiState> = _uiState
 
     init {
@@ -52,6 +54,7 @@ class HabitEditorViewModel @Inject constructor(
                         colorHex = habit.colorHex,
                         repeatDays = habit.repeatDays.ifEmpty { DayOfWeek.entries.toSet() },
                         reminderMinutes = habit.reminderMinutes,
+                        timesPerDay = habit.goal,
                     )
                 }
             }
@@ -63,6 +66,7 @@ class HabitEditorViewModel @Inject constructor(
     fun onEmoji(value: String) = _uiState.update { it.copy(emoji = value) }
     fun onColor(value: String) = _uiState.update { it.copy(colorHex = value) }
     fun onReminder(value: Int?) = _uiState.update { it.copy(reminderMinutes = value) }
+    fun onTimesPerDay(value: Int) = _uiState.update { it.copy(timesPerDay = value.coerceIn(1, 24)) }
 
     fun toggleDay(day: DayOfWeek) {
         _uiState.update { state ->
@@ -89,13 +93,14 @@ class HabitEditorViewModel @Inject constructor(
                     colorHex = state.colorHex,
                     repeatDays = state.repeatDays.ifEmpty { RepeatDays.fromMask(RepeatDays.ALL) },
                     reminderMinutes = state.reminderMinutes,
+                    timesPerDay = state.timesPerDay.coerceIn(1, 24),
                     isActive = previous?.isActive ?: true,
                     currentStreak = previous?.currentStreak ?: 0,
                     longestStreak = previous?.longestStreak ?: 0,
                     createdAt = previous?.createdAt ?: now,
                     updatedAt = now,
                     remoteId = previous?.remoteId,
-                    doneToday = previous?.doneToday ?: false,
+                    doneCount = previous?.doneCount ?: 0,
                 ),
             )
             _uiState.update { it.copy(saved = true) }

@@ -10,6 +10,7 @@ import com.kizen.tasks.ui.habit.HabitEditorScreen
 import com.kizen.tasks.ui.home.HomeScreen
 import com.kizen.tasks.ui.list.ListScreen
 import com.kizen.tasks.ui.lists.ListsScreen
+import com.kizen.tasks.ui.nudge.NudgeEditorScreen
 import com.kizen.tasks.ui.settings.SettingsScreen
 import com.kizen.tasks.ui.task.TaskEditorScreen
 
@@ -26,6 +27,8 @@ fun KizenNavHost() {
                 onOpenSettings = { nav.navigate("settings") },
                 onOpenHabit = { nav.navigate("habit?habitId=$it") },
                 onCreateHabit = { nav.navigate("habit") },
+                onOpenNudge = { nav.navigate("nudge?nudgeId=$it") },
+                onCreateNudge = { nav.navigate("nudge") },
             )
         }
         composable(
@@ -54,6 +57,14 @@ fun KizenNavHost() {
             ),
         ) {
             HabitEditorScreen(onBack = { nav.popBackStack() })
+        }
+        composable(
+            route = "nudge?nudgeId={nudgeId}",
+            arguments = listOf(
+                navArgument("nudgeId") { type = NavType.StringType; defaultValue = "" },
+            ),
+        ) {
+            NudgeEditorScreen(onBack = { nav.popBackStack() })
         }
         composable("lists") {
             ListsScreen(onBack = { nav.popBackStack() })

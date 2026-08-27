@@ -11,6 +11,13 @@ class SyncSettings @Inject constructor(
 ) {
     private val prefs = context.getSharedPreferences("kizen_sync", Context.MODE_PRIVATE)
 
+    init {
+        val stored = prefs.getString(KEY_USER, null)
+        if (stored.isNullOrBlank() || stored.startsWith("user-")) {
+            prefs.edit().putString(KEY_USER, DEFAULT_USER).apply()
+        }
+    }
+
     var isEnabled: Boolean
         get() = prefs.getBoolean(KEY_ENABLED, false)
         set(value) { prefs.edit().putBoolean(KEY_ENABLED, value).apply() }
@@ -20,12 +27,7 @@ class SyncSettings @Inject constructor(
         set(value) { prefs.edit().putString(KEY_URL, value.trim()).apply() }
 
     var userId: String
-        get() {
-            val stored = prefs.getString(KEY_USER, null)
-            if (!stored.isNullOrBlank() && !stored.startsWith("user-")) return stored
-            prefs.edit().putString(KEY_USER, DEFAULT_USER).apply()
-            return DEFAULT_USER
-        }
+        get() = prefs.getString(KEY_USER, DEFAULT_USER).orEmpty().ifBlank { DEFAULT_USER }
         set(value) {
             val clean = value.trim().ifBlank { DEFAULT_USER }
             prefs.edit().putString(KEY_USER, clean).apply()

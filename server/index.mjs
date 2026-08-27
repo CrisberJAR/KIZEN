@@ -4,15 +4,32 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHash, randomUUID } from "node:crypto";
 
+import { chimeNudge, clientSnapshot, rememberAlexa, silenceDoneNudges } from "./alexaReminders.mjs";
+
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
+loadDotEnv(path.join(ROOT, ".env"));
 const DATA = process.env.KIZEN_DATA_DIR || path.join(ROOT, "data");
 const PORT = Number(process.env.PORT || 8787);
 const GEMINI = process.env.GEMINI_API_KEY || "";
 const HOME_USER = (process.env.KIZEN_HOME_USER || "kizen-casa").trim() || "kizen-casa";
 
+function loadDotEnv(file) {
+  if (!fs.existsSync(file)) return;
+  for (const line of fs.readFileSync(file, "utf8").split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const split = trimmed.indexOf("=");
+    if (split < 1) continue;
+    const key = trimmed.slice(0, split).trim();
+    const value = trimmed.slice(split + 1).trim().replace(/^["']|["']$/g, "");
+    if (key && process.env[key] == null) process.env[key] = value;
+  }
+}
+
 fs.mkdirSync(DATA, { recursive: true });
 
-const empty = () => ({ lists: [], tasks: [], habits: [], habit_logs: [] });
+const TZ = process.env.KIZEN_TZ || "America/Mexico_City";
+const empty = () => ({ lists: [], tasks: [], habits: [], habit_logs: [], day_nudges: [], alexa: null });
 
 function looksLikeAlexaAccount(id) {
   const value = String(id || "").trim();
@@ -37,6 +54,10 @@ function load(userId) {
     data.tasks = Array.isArray(data.tasks) ? data.tasks : [];
     data.habits = Array.isArray(data.habits) ? data.habits : [];
     data.habit_logs = Array.isArray(data.habit_logs) ? data.habit_logs : [];
+    const rawNudges = Array.isArray(data.day_nudges) ? data.day_nudges : [];
+    data.day_nudges = pruneDayNudges(rawNudges);
+    if (data.day_nudges.length !== rawNudges.length) save(userId, data);
+    if (!data.alexa || typeof data.alexa !== "object") data.alexa = null;
     return data;
   } catch {
     return empty();
@@ -68,20 +89,43 @@ function mergeLogs(localItems, remoteItems) {
 }
 
 function isoDow() {
-  return ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"][
-    (new Date().getDay() + 6) % 7
-  ];
+  const weekday = new Intl.DateTimeFormat("en-US", { timeZone: TZ, weekday: "long" }).format(new Date());
+  return weekday.toUpperCase();
 }
 
 function dayEpoch() {
-  return Math.floor(Date.now() / 86_400_000);
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const num = (type) => Number(parts.find((part) => part.type === type)?.value || 0);
+  return Math.floor(Date.UTC(num("year"), num("month") - 1, num("day")) / 86_400_000);
 }
 
-function phrase(done, total, streak, open) {
-  if (total === 0 && open === 0) return "Hoy el día está en blanco. Un hábito pequeño basta para empezar.";
-  if (done === total && total > 0 && open === 0) return `Todo lo de hoy está listo. Tu mejor racha: ${streak} días. Respira.`;
-  if (streak >= 3) return `Racha de ${streak} días. ${done} de ${total} hábitos y ${open} tareas suaves.`;
-  return `${done} de ${total} hábitos de hoy. Sin prisa: ${open} tareas te esperan.`;
+function pruneDayNudges(items) {
+  const today = dayEpoch();
+  return (items || []).filter((item) => Number(item.day_epoch) >= today);
+}
+
+function todayNudges(user) {
+  const epoch = dayEpoch();
+  return (user.day_nudges || []).filter((item) => Number(item.day_epoch) === epoch);
+}
+
+function pendingNudges(user) {
+  return todayNudges(user).filter((item) => !item.is_done);
+}
+
+function phrase(done, total, streak, open, nudges) {
+  const aviso = nudges > 0 ? ` ${nudges} aviso${nudges === 1 ? "" : "s"} de hoy.` : "";
+  if (total === 0 && open === 0 && nudges === 0) return "Hoy el día está en blanco. Un hábito pequeño basta para empezar.";
+  if (done === total && total > 0 && open === 0 && nudges === 0) {
+    return `Todo lo de hoy está listo. Tu mejor racha: ${streak} días. Respira.`;
+  }
+  if (streak >= 3) return `Racha de ${streak} días. ${done} de ${total} hábitos y ${open} tareas suaves.${aviso}`;
+  return `${done} de ${total} hábitos de hoy. Sin prisa: ${open} tareas te esperan.${aviso}`;
 }
 
 function insights(user) {
@@ -96,12 +140,14 @@ function insights(user) {
   const done = todayHabits.filter((habit) => doneIds.has(habit.id)).length;
   const streak = Math.max(0, ...todayHabits.map((habit) => Number(habit.longest_streak || habit.current_streak || 0)), 0);
   const open = (user.tasks || []).filter((task) => !task.is_done).length;
+  const nudges = pendingNudges(user).length;
   return {
-    text: phrase(done, todayHabits.length, streak, open),
+    text: phrase(done, todayHabits.length, streak, open, nudges),
     habits_done_today: done,
     habits_total_today: todayHabits.length,
     best_streak: streak,
     open_tasks: open,
+    open_nudges: nudges,
   };
 }
 
@@ -109,7 +155,8 @@ async function withGemini(base, user) {
   if (!GEMINI) return base;
   const openTitles = (user.tasks || []).filter((task) => !task.is_done).slice(0, 8).map((task) => task.title).join(", ");
   const doneTitles = (user.tasks || []).filter((task) => task.is_done).slice(-8).map((task) => task.title).join(", ");
-  const prompt = `Eres Jarvis, voz suave de Kizen, para un parlante Alexa. En 1 o 2 frases cortas en español, cálidas y motivadoras, resume el día. Hecho: ${doneTitles || "aún nada"}. Pendiente: ${openTitles || "nada"}. Hábitos: ${base.habits_done_today} de ${base.habits_total_today}. Racha: ${base.best_streak}. No digas que eres una IA. Sin asteriscos ni listas.`;
+  const nudgeTitles = pendingNudges(user).slice(0, 6).map((item) => item.title).join(", ");
+  const prompt = `Eres Jarvis, voz suave de Kizen, para un parlante Alexa. En 1 o 2 frases cortas en español, cálidas y motivadoras, resume el día. Hecho: ${doneTitles || "aún nada"}. Pendiente: ${openTitles || "nada"}. Avisos de hoy: ${nudgeTitles || "ninguno"}. Hábitos: ${base.habits_done_today} de ${base.habits_total_today}. Racha: ${base.best_streak}. No digas que eres una IA. Sin asteriscos ni listas.`;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 4500);
   try {
@@ -144,10 +191,15 @@ function defaultList(user) {
 }
 
 async function alexa(user, body) {
+  const linked = rememberAlexa(user, body);
   const intent = body.intent || "INSIGHTS";
   const title = body.task?.title || body.utterance || "";
   const now = Date.now();
   const userId = body.user_id;
+  if (linked) save(userId, user);
+  if (intent === "LINK_ALEXA") {
+    return { speak: "Este Echo ya está enlazado con Kizen.", intent };
+  }
   if (intent === "ADD_TASK" && title) {
     const list = defaultList(user);
     user.tasks.push({
@@ -220,6 +272,43 @@ async function alexa(user, body) {
     const names = user.habits.filter((item) => item.is_active !== false).map((item) => item.title);
     return { speak: names.length ? `Tus hábitos: ${names.join(", ")}.` : "Aún no hay hábitos.", intent };
   }
+  if (intent === "ADD_NUDGE" && title) {
+    if (!Array.isArray(user.day_nudges)) user.day_nudges = [];
+    const nudgeId = body.task?.id || randomUUID();
+    user.day_nudges.push({
+      id: nudgeId,
+      title,
+      notes: "",
+      start_at: now,
+      interval_minutes: 20,
+      is_done: false,
+      day_epoch: dayEpoch(),
+      created_at: now,
+      updated_at: now,
+      items: [],
+    });
+    save(userId, user);
+    await chimeNudge(user, { id: nudgeId, title }, userId, save).catch(() => {});
+    return { speak: `Aviso de hoy: ${title}. Te lo voy a repetir hasta que lo marques.`, intent };
+  }
+  if (intent === "COMPLETE_NUDGE") {
+    const nudge =
+      pendingNudges(user).find((item) => title && item.title.toLowerCase().includes(title.toLowerCase())) ||
+      (user.day_nudges || []).find((item) => item.id === body.task_id);
+    if (!nudge) return { speak: "No encontré ese aviso de hoy. ¿Me dices el nombre otra vez?", intent };
+    nudge.is_done = true;
+    nudge.updated_at = now;
+    save(userId, user);
+    await chimeNudge(user, { id: nudge.id, title: nudge.title, cancel: true }, userId, save).catch(() => {});
+    return { speak: `Listo. Ya no te aviso de ${nudge.title}.`, intent };
+  }
+  if (intent === "LIST_NUDGES") {
+    const open = pendingNudges(user).map((item) => item.title);
+    return {
+      speak: open.length ? `Avisos de hoy: ${open.slice(0, 6).join(", ")}.` : "No tienes avisos pendientes hoy.",
+      intent,
+    };
+  }
   if (intent === "STREAK") {
     const best = user.habits.reduce((max, habit) => Math.max(max, Number(habit.longest_streak || 0)), 0);
     return { speak: best ? `Tu mejor racha es de ${best} días.` : "La racha empieza con un solo día.", intent };
@@ -266,7 +355,7 @@ http
         return json(res, 200, { ok: true, gemini: Boolean(GEMINI) });
       }
       if (req.method === "GET" && url.pathname === "/api/v3/sync") {
-        return json(res, 200, load(userId));
+        return json(res, 200, clientSnapshot(load(userId)));
       }
       if (req.method === "PUT" && url.pathname === "/api/v3/sync") {
         const incoming = await bodyOf(req);
@@ -276,9 +365,12 @@ http
           tasks: mergeById(local.tasks, incoming.tasks),
           habits: mergeById(local.habits, incoming.habits),
           habit_logs: mergeLogs(local.habit_logs, incoming.habit_logs),
+          day_nudges: pruneDayNudges(mergeById(local.day_nudges, incoming.day_nudges)),
+          alexa: local.alexa || null,
         };
         save(userId, merged);
-        return json(res, 200, merged);
+        await silenceDoneNudges(merged, userId, save).catch(() => {});
+        return json(res, 200, clientSnapshot(merged));
       }
       if (req.method === "GET" && url.pathname === "/api/v3/tasks/insights") {
         return json(res, 200, insights(load(userId)));
@@ -294,6 +386,13 @@ http
         const spoken = await alexa(load(payload.user_id), payload);
         console.log("Speak:", spoken.speak);
         return json(res, 200, spoken);
+      }
+      if (req.method === "POST" && url.pathname === "/api/v3/alexa/chime") {
+        const payload = await bodyOf(req);
+        const user = load(userId);
+        const result = await chimeNudge(user, payload, userId, save);
+        console.log("Alexa chime:", payload.id, result);
+        return json(res, 200, result);
       }
       json(res, 404, { error: "not_found" });
     } catch (error) {

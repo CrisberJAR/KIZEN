@@ -10,6 +10,7 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
 
     <application
         android:name=".KizenApplication"
@@ -34,6 +35,94 @@
 
         <receiver
             android:name=".notification.ReminderReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".notification.TaskAlarmReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".notification.DayNudgeReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".notification.NudgeDoneReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".widget.KizenTodayWidget"
+            android:exported="true"
+            android:label="@string/widget_today">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_today_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.KizenHabitsWidget"
+            android:exported="true"
+            android:label="@string/widget_habits">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_habits_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.KizenTasksWidget"
+            android:exported="true"
+            android:label="@string/widget_tasks">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_tasks_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.KizenNudgesWidget"
+            android:exported="true"
+            android:label="@string/widget_nudges">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_nudges_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.KizenOneHabitWidget"
+            android:exported="true"
+            android:label="@string/widget_one_habit">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_one_habit_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.KizenOneTaskWidget"
+            android:exported="true"
+            android:label="@string/widget_one_task">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_one_task_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.WidgetPinnedReceiver"
             android:exported="false" />
 
         <receiver

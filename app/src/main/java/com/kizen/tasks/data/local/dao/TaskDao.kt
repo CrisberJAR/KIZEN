@@ -74,7 +74,10 @@ interface TaskDao {
             0 AS subtaskTotal, 0 AS subtaskDone
         FROM tasks t
         INNER JOIN task_lists l ON l.id = t.listId
-        WHERE t.reminderAt IS NOT NULL AND t.reminderAt > :now AND t.isDone = 0
+        WHERE t.isDone = 0 AND (
+            (t.reminderAt IS NOT NULL AND t.reminderAt > :now)
+            OR (t.dueAt IS NOT NULL AND t.dueAt > :now)
+        )
         """
     )
     suspend fun pendingReminders(now: Long): List<TaskWithList>

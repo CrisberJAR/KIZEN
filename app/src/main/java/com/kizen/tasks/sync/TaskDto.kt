@@ -67,6 +67,9 @@ enum class AlexaIntent {
     ADD_HABIT,
     COMPLETE_HABIT,
     LIST_HABITS,
+    ADD_NUDGE,
+    COMPLETE_NUDGE,
+    LIST_NUDGES,
     STREAK,
     INSIGHTS,
 }

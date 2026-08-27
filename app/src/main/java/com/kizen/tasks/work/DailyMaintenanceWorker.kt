@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
+import com.kizen.tasks.domain.repository.DayNudgeRepository
 import com.kizen.tasks.domain.repository.HabitRepository
 import com.kizen.tasks.domain.repository.TaskRepository
 import com.kizen.tasks.notification.ReminderScheduler
@@ -17,15 +18,19 @@ class DailyMaintenanceWorker @AssistedInject constructor(
     @Assisted params: WorkerParameters,
     private val habitRepository: HabitRepository,
     private val taskRepository: TaskRepository,
+    private val nudgeRepository: DayNudgeRepository,
     private val reminderScheduler: ReminderScheduler,
     private val maintenanceScheduler: MaintenanceScheduler,
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
         habitRepository.recalculateStreaks()
+        nudgeRepository.pruneOlderThanYesterday()
         val monthAgo = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(30)
         taskRepository.pruneCompletedBefore(monthAgo)
         habitRepository.pendingReminders().forEach { reminderScheduler.syncHabit(it) }
+        taskRepository.pendingReminders().forEach { reminderScheduler.sync(it) }
+        nudgeRepository.pendingToday().forEach { reminderScheduler.syncNudge(it) }
         maintenanceScheduler.enqueueNext()
         return Result.success()
     }

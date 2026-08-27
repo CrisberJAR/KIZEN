@@ -12,6 +12,9 @@ interface SubtaskDao {
     fun observeByTask(taskId: String): Flow<List<SubtaskEntity>>
 
     @Query("SELECT * FROM subtasks")
+    fun observeAll(): Flow<List<SubtaskEntity>>
+
+    @Query("SELECT * FROM subtasks")
     suspend fun all(): List<SubtaskEntity>
 
     @Upsert

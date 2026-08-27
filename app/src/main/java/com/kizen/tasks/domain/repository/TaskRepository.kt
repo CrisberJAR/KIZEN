@@ -9,6 +9,7 @@ interface TaskRepository {
     fun observeByList(listId: String): Flow<List<Task>>
     fun observeTask(id: String): Flow<Task?>
     fun observeSubtasks(taskId: String): Flow<List<Subtask>>
+    fun observeAllSubtasks(): Flow<List<Subtask>>
     suspend fun getTask(id: String): Task?
     suspend fun upsert(task: Task)
     suspend fun setDone(id: String, done: Boolean)

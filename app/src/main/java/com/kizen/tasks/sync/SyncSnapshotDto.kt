@@ -9,6 +9,29 @@ data class SyncSnapshotDto(
     val tasks: List<TaskDto> = emptyList(),
     val habits: List<HabitDto> = emptyList(),
     @SerialName("habit_logs") val habitLogs: List<HabitLogDto> = emptyList(),
+    @SerialName("day_nudges") val dayNudges: List<DayNudgeDto> = emptyList(),
+)
+
+@Serializable
+data class DayNudgeDto(
+    val id: String,
+    val title: String,
+    val notes: String = "",
+    @SerialName("start_at") val startAt: Long,
+    @SerialName("interval_minutes") val intervalMinutes: Int = 20,
+    @SerialName("is_done") val isDone: Boolean = false,
+    @SerialName("day_epoch") val dayEpoch: Long,
+    @SerialName("created_at") val createdAt: Long,
+    @SerialName("updated_at") val updatedAt: Long,
+    val items: List<NudgeItemDto> = emptyList(),
+)
+
+@Serializable
+data class NudgeItemDto(
+    val id: String,
+    val title: String,
+    @SerialName("is_done") val isDone: Boolean = false,
+    val position: Int = 0,
 )
 
 @Serializable
@@ -16,6 +39,7 @@ data class HabitLogDto(
     val id: String,
     @SerialName("habit_id") val habitId: String,
     @SerialName("day_epoch") val dayEpoch: Long,
+    val count: Int = 1,
     @SerialName("completed_at") val completedAt: Long,
 )
 

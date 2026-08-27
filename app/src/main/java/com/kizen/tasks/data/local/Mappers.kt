@@ -3,11 +3,15 @@ package com.kizen.tasks.data.local
 import com.kizen.tasks.data.local.dao.HabitWithToday
 import com.kizen.tasks.data.local.dao.TaskListWithCounts
 import com.kizen.tasks.data.local.dao.TaskWithList
+import com.kizen.tasks.data.local.entity.DayNudgeEntity
 import com.kizen.tasks.data.local.entity.HabitEntity
+import com.kizen.tasks.data.local.entity.NudgeItemEntity
 import com.kizen.tasks.data.local.entity.SubtaskEntity
 import com.kizen.tasks.data.local.entity.TaskEntity
 import com.kizen.tasks.data.local.entity.TaskListEntity
+import com.kizen.tasks.domain.model.DayNudge
 import com.kizen.tasks.domain.model.Habit
+import com.kizen.tasks.domain.model.NudgeItem
 import com.kizen.tasks.domain.model.Priority
 import com.kizen.tasks.domain.model.RepeatDays
 import com.kizen.tasks.domain.model.Subtask
@@ -101,7 +105,7 @@ fun Subtask.toEntity() = SubtaskEntity(
     remoteId = remoteId,
 )
 
-fun HabitEntity.toDomain(doneToday: Boolean = false) = Habit(
+fun HabitEntity.toDomain(doneCount: Int = 0) = Habit(
     id = id,
     title = title,
     notes = notes,
@@ -109,16 +113,17 @@ fun HabitEntity.toDomain(doneToday: Boolean = false) = Habit(
     colorHex = colorHex,
     repeatDays = RepeatDays.fromMask(repeatDaysMask),
     reminderMinutes = reminderMinutes,
+    timesPerDay = timesPerDay.coerceAtLeast(1),
     isActive = isActive,
     currentStreak = currentStreak,
     longestStreak = longestStreak,
     createdAt = createdAt,
     updatedAt = updatedAt,
     remoteId = remoteId,
-    doneToday = doneToday,
+    doneCount = doneCount,
 )
 
-fun HabitWithToday.toDomain() = habit.toDomain(doneToday)
+fun HabitWithToday.toDomain() = habit.toDomain(doneCount)
 
 fun Habit.toEntity() = HabitEntity(
     id = id,
@@ -128,10 +133,54 @@ fun Habit.toEntity() = HabitEntity(
     colorHex = colorHex,
     repeatDaysMask = RepeatDays.toMask(repeatDays),
     reminderMinutes = reminderMinutes,
+    timesPerDay = timesPerDay.coerceAtLeast(1),
     isActive = isActive,
     currentStreak = currentStreak,
     longestStreak = longestStreak,
     createdAt = createdAt,
     updatedAt = updatedAt,
     remoteId = remoteId,
+)
+
+fun DayNudgeEntity.toDomain(items: List<NudgeItem> = emptyList()) = DayNudge(
+    id = id,
+    title = title,
+    notes = notes,
+    startAt = startAt,
+    intervalMinutes = intervalMinutes.coerceAtLeast(5),
+    isDone = isDone,
+    dayEpoch = dayEpoch,
+    createdAt = createdAt,
+    updatedAt = updatedAt,
+    items = items,
+)
+
+fun DayNudge.toEntity() = DayNudgeEntity(
+    id = id,
+    title = title,
+    notes = notes,
+    startAt = startAt,
+    intervalMinutes = intervalMinutes.coerceAtLeast(5),
+    isDone = isDone,
+    dayEpoch = dayEpoch,
+    createdAt = createdAt,
+    updatedAt = updatedAt,
+)
+
+fun NudgeItemEntity.toDomain() = NudgeItem(
+    id = id,
+    nudgeId = nudgeId,
+    title = title,
+    isDone = isDone,
+    position = position,
+    updatedAt = updatedAt,
+)
+
+fun NudgeItem.toEntity() = NudgeItemEntity(
+    id = id,
+    nudgeId = nudgeId,
+    title = title,
+    isDone = isDone,
+    position = position,
+    updatedAt = updatedAt,
 )

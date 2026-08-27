@@ -11,6 +11,7 @@ import com.kizen.tasks.domain.model.RepeatDays
 import com.kizen.tasks.domain.model.StreakCalculator
 import com.kizen.tasks.domain.repository.HabitRepository
 import com.kizen.tasks.notification.ReminderScheduler
+import com.kizen.tasks.widget.WidgetRefresher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import java.time.Instant
@@ -25,6 +26,7 @@ class HabitRepositoryImpl @Inject constructor(
     private val habitDao: HabitDao,
     private val logDao: HabitLogDao,
     private val reminderScheduler: ReminderScheduler,
+    private val widgetRefresher: WidgetRefresher,
 ) : HabitRepository {
 
     override fun observeToday(): Flow<List<Habit>> {
@@ -44,46 +46,54 @@ class HabitRepositoryImpl @Inject constructor(
 
     override suspend fun getHabit(id: String): Habit? {
         val entity = habitDao.get(id) ?: return null
-        val doneToday = logDao.forDay(id, LocalDate.now().toEpochDay()) != null
-        return entity.toDomain(doneToday)
+        val count = logDao.forDay(id, LocalDate.now().toEpochDay())?.count ?: 0
+        return entity.toDomain(count)
     }
 
     override suspend fun upsert(habit: Habit) {
         habitDao.upsert(habit.toEntity())
         reminderScheduler.syncHabit(habit)
+        widgetRefresher.refresh()
     }
 
-    override suspend fun toggleToday(id: String): Habit? {
+    override suspend fun bumpToday(id: String, delta: Int): Habit? {
+        if (delta == 0) return getHabit(id)
+        val entity = habitDao.get(id) ?: return null
+        val goal = entity.timesPerDay.coerceAtLeast(1)
         val today = LocalDate.now().toEpochDay()
         val existing = logDao.forDay(id, today)
-        if (existing != null) {
-            logDao.deleteDay(id, today)
-        } else {
-            logDao.insert(
+        val next = ((existing?.count ?: 0) + delta).coerceIn(0, goal)
+        when {
+            next <= 0 -> logDao.deleteDay(id, today)
+            existing == null -> logDao.insert(
                 HabitLogEntity(
                     id = UUID.randomUUID().toString(),
                     habitId = id,
                     dayEpoch = today,
+                    count = next,
                     completedAt = System.currentTimeMillis(),
                 ),
             )
+            else -> logDao.upsert(existing.copy(count = next, completedAt = System.currentTimeMillis()))
         }
         refreshStreak(id)
         val habit = getHabit(id)
         if (habit != null) reminderScheduler.syncHabit(habit)
+        widgetRefresher.refresh()
         return habit
     }
 
     override suspend fun delete(id: String) {
         reminderScheduler.cancelHabit(id)
         habitDao.delete(id)
+        widgetRefresher.refresh()
     }
 
     override suspend fun pendingReminders(): List<Habit> {
         val today = LocalDate.now().toEpochDay()
         return habitDao.active().map { entity ->
-            val done = logDao.forDay(entity.id, today) != null
-            entity.toDomain(done)
+            val count = logDao.forDay(entity.id, today)?.count ?: 0
+            entity.toDomain(count)
         }.filter { it.reminderMinutes != null }
     }
 
@@ -99,7 +109,7 @@ class HabitRepositoryImpl @Inject constructor(
 
     private suspend fun refreshStreak(id: String) {
         val entity = habitDao.get(id) ?: return
-        val days = logDao.daysFor(id).toSet()
+        val days = logDao.completeDaysFor(id).toSet()
         val createdOn = Instant.ofEpochMilli(entity.createdAt).atZone(ZoneId.systemDefault()).toLocalDate()
         val repeat = RepeatDays.fromMask(entity.repeatDaysMask)
         val current = StreakCalculator.current(days, repeat, LocalDate.now(), createdOn)

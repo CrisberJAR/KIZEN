@@ -9,7 +9,7 @@ interface HabitRepository {
     suspend fun todaySnapshot(): List<Habit>
     suspend fun getHabit(id: String): Habit?
     suspend fun upsert(habit: Habit)
-    suspend fun toggleToday(id: String): Habit?
+    suspend fun bumpToday(id: String, delta: Int): Habit?
     suspend fun delete(id: String)
     suspend fun pendingReminders(): List<Habit>
     suspend fun recalculateStreaks()

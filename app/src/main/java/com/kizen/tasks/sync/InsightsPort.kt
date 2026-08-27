@@ -32,6 +32,7 @@ data class HabitDto(
     @SerialName("color_hex") val colorHex: String,
     @SerialName("repeat_days") val repeatDays: List<String>,
     @SerialName("reminder_minutes") val reminderMinutes: Int? = null,
+    @SerialName("times_per_day") val timesPerDay: Int = 1,
     @SerialName("is_active") val isActive: Boolean = true,
     @SerialName("current_streak") val currentStreak: Int = 0,
     @SerialName("longest_streak") val longestStreak: Int = 0,

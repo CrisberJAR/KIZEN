@@ -48,8 +48,9 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun onUserId(value: String) {
-        settings.userId = value
-        _uiState.update { it.copy(userId = settings.userId) }
+        val clean = value.filter { it.isLetterOrDigit() || it == '-' || it == '_' }.take(48)
+        _uiState.update { it.copy(userId = clean) }
+        if (clean.isNotBlank()) settings.userId = clean
     }
 
     fun syncNow() {

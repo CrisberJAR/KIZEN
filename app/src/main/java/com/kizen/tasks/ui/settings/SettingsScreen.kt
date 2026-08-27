@@ -26,8 +26,11 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -130,12 +133,20 @@ fun SettingsScreen(
                 OutlinedTextField(
                     value = state.userId,
                     onValueChange = viewModel::onUserId,
+                    enabled = true,
+                    readOnly = false,
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
+                    placeholder = { Text("kizen-casa") },
+                    keyboardOptions = KeyboardOptions(
+                        capitalization = KeyboardCapitalization.None,
+                        imeAction = ImeAction.Done,
+                    ),
                     shape = RoundedCornerShape(22.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedContainerColor = CreamCard,
                         unfocusedContainerColor = CreamCard,
+                        disabledContainerColor = CreamCard,
                         focusedBorderColor = PinkSoft,
                         unfocusedBorderColor = PinkSoft.copy(alpha = 0.35f),
                     ),
