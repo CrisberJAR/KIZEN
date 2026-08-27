@@ -15,12 +15,14 @@ import com.kizen.tasks.sync.InsightCopy
 import com.kizen.tasks.sync.SyncPort
 import com.kizen.tasks.widget.WidgetRefresher
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 data class HomeUiState(
@@ -90,7 +92,9 @@ class HomeViewModel @Inject constructor(
 
     fun pullCloud() {
         viewModelScope.launch {
-            if (syncPort.isEnabled) syncPort.sync()
+            if (syncPort.isEnabled) withContext(Dispatchers.IO) {
+                syncPort.sync()
+            }
             widgetRefresher.refresh()
         }
     }

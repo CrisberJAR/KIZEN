@@ -3,7 +3,7 @@ package com.kizen.tasks.notification
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import com.kizen.tasks.domain.model.nudgeFollowupMillis
+import com.kizen.tasks.domain.model.nextNudgeMillis
 import com.kizen.tasks.domain.repository.DayNudgeRepository
 import com.kizen.tasks.sync.AlexaChimeClient
 import dagger.hilt.android.AndroidEntryPoint
@@ -42,7 +42,12 @@ class DayNudgeReceiver : BroadcastReceiver() {
                     body = "Te aviso cada $interval min hasta que lo marques como hecho.",
                     notifyId = notifyId(nudge.id),
                 )
-                reminderScheduler.scheduleNudgeAt(nudge, nudgeFollowupMillis(nudge))
+                val nextAt = nextNudgeMillis(nudge)
+                if (nextAt == null) {
+                    reminderScheduler.cancelNudge(nudgeId)
+                } else {
+                    reminderScheduler.scheduleNudgeAt(nudge, nextAt)
+                }
                 keepAliveForSound = true
                 AlarmPlayer.play(context, durationMs = 10_000L, pending = pending)
             } finally {

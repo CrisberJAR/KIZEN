@@ -2,14 +2,17 @@ package com.kizen.tasks.ui.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.kizen.tasks.domain.repository.DayNudgeRepository
 import com.kizen.tasks.sync.SyncPort
 import com.kizen.tasks.sync.SyncSettings
 import com.kizen.tasks.work.SyncScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 data class SettingsUiState(
@@ -25,6 +28,7 @@ class SettingsViewModel @Inject constructor(
     private val settings: SyncSettings,
     private val syncPort: SyncPort,
     private val syncScheduler: SyncScheduler,
+    private val nudgeRepository: DayNudgeRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(
@@ -55,14 +59,15 @@ class SettingsViewModel @Inject constructor(
 
     fun syncNow() {
         viewModelScope.launch {
-            _uiState.update { it.copy(busy = true, message = "Sincronizando…") }
-            val result = syncPort.sync()
+            _uiState.update { it.copy(busy = true, message = "Sincronizando… Render a veces tarda un minuto.") }
+            val result = withContext(Dispatchers.IO) { syncPort.sync() }
+            val nudges = runCatching { nudgeRepository.todaySnapshot().size }.getOrDefault(0)
             _uiState.update {
                 it.copy(
                     busy = false,
                     message = result.fold(
-                        onSuccess = { "Listo. Nubi ya está en la nube." },
-                        onFailure = { error -> "No pude conectar: ${error.message ?: "revisa la URL"}" },
+                        onSuccess = { "Listo. Este teléfono tiene $nudges avisos de hoy. Abre Inicio en el otro y pulsa Sincronizar ahora." },
+                        onFailure = { error -> "No pude conectar: ${error.message ?: "espera un minuto y reintenta"}" },
                     ),
                 )
             }

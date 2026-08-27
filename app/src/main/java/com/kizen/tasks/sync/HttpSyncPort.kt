@@ -1,5 +1,6 @@
 package com.kizen.tasks.sync
 
+import kotlinx.coroutines.delay
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -25,8 +26,18 @@ class HttpSyncPort @Inject constructor(
 
     override suspend fun sync(): Result<Unit> = runCatching {
         if (!settings.isEnabled) return@runCatching
-        runCatching { store.merge(apiFactory.api().getSync()) }
-        store.merge(apiFactory.api().putSync(store.export()))
+        var lastError: Throwable? = null
+        repeat(3) { attempt ->
+            try {
+                runCatching { store.merge(apiFactory.api().getSync()) }
+                store.merge(apiFactory.api().putSync(store.export()))
+                return@runCatching
+            } catch (error: Throwable) {
+                lastError = error
+                if (attempt < 2) delay(2_000L * (attempt + 1))
+            }
+        }
+        throw lastError ?: IllegalStateException("No pude sincronizar")
     }
 }
 

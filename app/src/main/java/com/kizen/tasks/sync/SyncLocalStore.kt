@@ -291,7 +291,7 @@ private fun DayNudgeDto.toEntity(createdAt: Long?, todayEpoch: Long) = DayNudgeE
     startAt = startAt,
     intervalMinutes = intervalMinutes.coerceAtLeast(5),
     isDone = isDone,
-    dayEpoch = if (kotlin.math.abs(dayEpoch - todayEpoch) <= 1L) todayEpoch else dayEpoch,
+    dayEpoch = todayEpoch,
     createdAt = createdAt ?: this.createdAt,
     updatedAt = updatedAt,
 )

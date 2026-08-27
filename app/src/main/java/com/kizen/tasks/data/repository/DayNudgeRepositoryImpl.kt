@@ -41,7 +41,7 @@ class DayNudgeRepositoryImpl @Inject constructor(
         ) { nudges, items ->
             val today = KizenDates.todayEpoch()
             val grouped = items.groupBy { it.nudgeId }
-            nudges.filter { it.dayEpoch == today }.map { entity ->
+            nudges.filter { kotlin.math.abs(it.dayEpoch - today) <= 1L }.map { entity ->
                 entity.toDomain(grouped[entity.id].orEmpty().sortedBy { it.position }.map { it.toDomain() })
             }
         }
@@ -52,7 +52,7 @@ class DayNudgeRepositoryImpl @Inject constructor(
 
     override suspend fun todaySnapshot(): List<DayNudge> {
         val today = KizenDates.todayEpoch()
-        return nudgeDao.forDay(today).map { entity ->
+        return nudgeDao.all().filter { kotlin.math.abs(it.dayEpoch - today) <= 1L }.map { entity ->
             entity.toDomain(itemDao.forNudge(entity.id).map { it.toDomain() })
         }
     }
@@ -128,6 +128,6 @@ class DayNudgeRepositoryImpl @Inject constructor(
     private fun nudgeNotifyId(id: String): Int = "nudge:$id".hashCode()
 
     private suspend fun pushCloud() {
-        if (syncPort.isEnabled) runCatching { syncPort.push() }
+        if (syncPort.isEnabled) runCatching { syncPort.sync() }
     }
 }
