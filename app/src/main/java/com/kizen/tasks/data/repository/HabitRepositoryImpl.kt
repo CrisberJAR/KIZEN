@@ -11,8 +11,10 @@ import com.kizen.tasks.domain.model.RepeatDays
 import com.kizen.tasks.domain.model.StreakCalculator
 import com.kizen.tasks.domain.repository.HabitRepository
 import com.kizen.tasks.notification.ReminderScheduler
+import com.kizen.tasks.sync.SyncPort
 import com.kizen.tasks.sync.TombstoneStore
 import com.kizen.tasks.widget.WidgetRefresher
+import dagger.Lazy
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import java.time.Instant
@@ -29,6 +31,7 @@ class HabitRepositoryImpl @Inject constructor(
     private val reminderScheduler: ReminderScheduler,
     private val widgetRefresher: WidgetRefresher,
     private val tombstones: TombstoneStore,
+    private val syncPort: Lazy<SyncPort>,
 ) : HabitRepository {
 
     override fun observeToday(): Flow<List<Habit>> {
@@ -66,23 +69,28 @@ class HabitRepositoryImpl @Inject constructor(
         val today = LocalDate.now().toEpochDay()
         val existing = logDao.forDay(id, today)
         val next = ((existing?.count ?: 0) + delta).coerceIn(0, goal)
-        when {
-            next <= 0 -> logDao.deleteDay(id, today)
-            existing == null -> logDao.insert(
-                HabitLogEntity(
-                    id = UUID.randomUUID().toString(),
-                    habitId = id,
-                    dayEpoch = today,
-                    count = next,
-                    completedAt = System.currentTimeMillis(),
-                ),
-            )
-            else -> logDao.upsert(existing.copy(count = next, completedAt = System.currentTimeMillis()))
+        val now = System.currentTimeMillis()
+        if (existing == null) {
+            if (next > 0) {
+                logDao.insert(
+                    HabitLogEntity(
+                        id = UUID.randomUUID().toString(),
+                        habitId = id,
+                        dayEpoch = today,
+                        count = next,
+                        completedAt = now,
+                    ),
+                )
+            }
+        } else {
+            logDao.upsert(existing.copy(count = next, completedAt = now))
         }
         refreshStreak(id)
         val habit = getHabit(id)
         if (habit != null) reminderScheduler.syncHabit(habit)
         widgetRefresher.refresh()
+        val port = syncPort.get()
+        if (port.isEnabled) runCatching { port.push() }
         return habit
     }
 

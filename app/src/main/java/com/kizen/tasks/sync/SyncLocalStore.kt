@@ -106,7 +106,15 @@ class SyncLocalStore @Inject constructor(
                 habitDao.upsert(dto.toEntity())
             }
         }
-        remote.habitLogs.forEach { habitLogDao.upsert(it.toEntity()) }
+        remote.habitLogs.forEach { dto ->
+            val local = habitLogDao.forDay(dto.habitId, dto.dayEpoch)
+            if (local == null || dto.completedAt >= local.completedAt) {
+                if (local != null && local.id != dto.id) {
+                    habitLogDao.deleteDay(dto.habitId, dto.dayEpoch)
+                }
+                habitLogDao.upsert(dto.toEntity())
+            }
+        }
         val today = KizenDates.todayEpoch()
         remote.dayNudges.forEach { dto ->
             if (dto.id in tombstones.nudgeIds()) return@forEach
@@ -259,7 +267,7 @@ private fun HabitLogDto.toEntity() = HabitLogEntity(
     id = id,
     habitId = habitId,
     dayEpoch = dayEpoch,
-    count = count.coerceAtLeast(1),
+    count = count.coerceAtLeast(0),
     completedAt = completedAt,
 )
 

@@ -124,9 +124,14 @@ function withoutDeleted(items, deleted) {
 }
 
 function mergeLogs(localItems, remoteItems) {
-  const map = new Map((localItems || []).map((item) => [`${item.habit_id}:${item.day_epoch}`, item]));
-  for (const item of remoteItems || []) {
-    map.set(`${item.habit_id}:${item.day_epoch}`, item);
+  const map = new Map();
+  for (const item of [...(localItems || []), ...(remoteItems || [])]) {
+    if (!item || !item.habit_id) continue;
+    const key = `${item.habit_id}:${item.day_epoch}`;
+    const prev = map.get(key);
+    if (!prev || Number(item.completed_at || 0) >= Number(prev.completed_at || 0)) {
+      map.set(key, item);
+    }
   }
   return [...map.values()];
 }

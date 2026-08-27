@@ -91,7 +91,7 @@ fun SettingsScreen(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text("Sincronizar", style = KizenTypography.titleMedium)
-                        Text("Cada 15 minutos si hay red", style = KizenTypography.bodyMedium, color = TextMute)
+                        Text("Al abrir la app o al tocar un hábito se sincroniza ya. En segundo plano Android solo permite cada 15 minutos.", style = KizenTypography.bodyMedium, color = TextMute)
                     }
                     Switch(
                         checked = state.enabled,
