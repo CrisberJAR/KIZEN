@@ -10,6 +10,16 @@ data class SyncSnapshotDto(
     val habits: List<HabitDto> = emptyList(),
     @SerialName("habit_logs") val habitLogs: List<HabitLogDto> = emptyList(),
     @SerialName("day_nudges") val dayNudges: List<DayNudgeDto> = emptyList(),
+    @SerialName("deleted_tasks") val deletedTasks: List<DeletedRefDto> = emptyList(),
+    @SerialName("deleted_habits") val deletedHabits: List<DeletedRefDto> = emptyList(),
+    @SerialName("deleted_day_nudges") val deletedDayNudges: List<DeletedRefDto> = emptyList(),
+    @SerialName("deleted_lists") val deletedLists: List<DeletedRefDto> = emptyList(),
+)
+
+@Serializable
+data class DeletedRefDto(
+    val id: String,
+    @SerialName("deleted_at") val deletedAt: Long,
 )
 
 @Serializable

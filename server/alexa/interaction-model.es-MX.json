@@ -40,8 +40,8 @@
             "lista mis tareas",
             "cuáles son mis tareas",
             "cuales son mis tareas",
-            "cuáles son mis pendientes",
-            "qué me falta"
+            "cuáles son mis tareas pendientes",
+            "qué tareas me faltan"
           ]
         },
         {
@@ -119,11 +119,18 @@
           "name": "ListNudgesIntent",
           "slots": [],
           "samples": [
+            "avisos",
+            "mis avisos",
+            "los avisos",
             "avisos de hoy",
             "qué avisos tengo",
             "lista mis avisos",
+            "lista de avisos",
             "cuáles son mis avisos",
             "cuales son mis avisos",
+            "cuáles son los avisos",
+            "dime mis avisos",
+            "dime los avisos",
             "qué avisos de hoy tengo"
           ]
         },

@@ -41,6 +41,7 @@ class SyncLocalStore @Inject constructor(
     private val habitRepository: HabitRepository,
     private val reminderScheduler: ReminderScheduler,
     private val widgetRefresher: WidgetRefresher,
+    private val tombstones: TombstoneStore,
 ) {
     suspend fun export(): SyncSnapshotDto {
         val subtasks = subtaskDao.all().groupBy { it.taskId }
@@ -54,11 +55,31 @@ class SyncLocalStore @Inject constructor(
             dayNudges = dayNudgeDao.all().map { entity ->
                 entity.toDto(nudgeItemDao.forNudge(entity.id).map { it.toDto() })
             },
+            deletedTasks = tombstones.exportTasks(),
+            deletedHabits = tombstones.exportHabits(),
+            deletedDayNudges = tombstones.exportNudges(),
+            deletedLists = tombstones.exportLists(),
         )
     }
 
     suspend fun merge(remote: SyncSnapshotDto) {
+        tombstones.absorb(remote.deletedTasks, remote.deletedHabits, remote.deletedDayNudges, remote.deletedLists)
+        tombstones.listIds().forEach { listDao.delete(it) }
+        tombstones.taskIds().forEach { id ->
+            reminderScheduler.cancel(id)
+            taskDao.delete(id)
+        }
+        tombstones.habitIds().forEach { id ->
+            reminderScheduler.cancelHabit(id)
+            habitDao.delete(id)
+        }
+        tombstones.nudgeIds().forEach { id ->
+            reminderScheduler.cancelNudge(id)
+            KizenNotifier.cancel(context, "nudge:$id".hashCode())
+            dayNudgeDao.delete(id)
+        }
         remote.lists.forEach { dto ->
+            if (dto.id in tombstones.listIds()) return@forEach
             val local = listDao.get(dto.id)
             if (local == null || dto.updatedAt >= local.updatedAt) {
                 listDao.upsert(dto.toEntity(local?.createdAt))
@@ -66,6 +87,7 @@ class SyncLocalStore @Inject constructor(
         }
         val fallbackListId = listDao.all().firstOrNull()?.id
         remote.tasks.forEach { dto ->
+            if (dto.id in tombstones.taskIds()) return@forEach
             val local = taskDao.getById(dto.id)
             if (local == null || dto.updatedAt >= local.updatedAt) {
                 val listId = listDao.get(dto.listId)?.id ?: fallbackListId ?: return@forEach
@@ -74,6 +96,7 @@ class SyncLocalStore @Inject constructor(
             }
         }
         remote.habits.forEach { dto ->
+            if (dto.id in tombstones.habitIds()) return@forEach
             val local = habitDao.get(dto.id)
             if (local == null || dto.updatedAt >= local.updatedAt) {
                 habitDao.upsert(dto.toEntity())
@@ -81,6 +104,7 @@ class SyncLocalStore @Inject constructor(
         }
         remote.habitLogs.forEach { habitLogDao.upsert(it.toEntity()) }
         remote.dayNudges.forEach { dto ->
+            if (dto.id in tombstones.nudgeIds()) return@forEach
             val local = dayNudgeDao.get(dto.id)
             if (local == null || dto.updatedAt >= local.updatedAt) {
                 dayNudgeDao.upsert(dto.toEntity(local?.createdAt))

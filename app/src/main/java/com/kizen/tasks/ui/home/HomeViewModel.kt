@@ -90,7 +90,7 @@ class HomeViewModel @Inject constructor(
 
     fun pullCloud() {
         viewModelScope.launch {
-            if (syncPort.isEnabled) syncPort.pull()
+            if (syncPort.isEnabled) syncPort.sync()
             widgetRefresher.refresh()
         }
     }

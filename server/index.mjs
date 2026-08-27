@@ -29,7 +29,18 @@ function loadDotEnv(file) {
 fs.mkdirSync(DATA, { recursive: true });
 
 const TZ = process.env.KIZEN_TZ || "America/Mexico_City";
-const empty = () => ({ lists: [], tasks: [], habits: [], habit_logs: [], day_nudges: [], alexa: null });
+const empty = () => ({
+  lists: [],
+  tasks: [],
+  habits: [],
+  habit_logs: [],
+  day_nudges: [],
+  deleted_tasks: [],
+  deleted_habits: [],
+  deleted_day_nudges: [],
+  deleted_lists: [],
+  alexa: null,
+});
 
 function looksLikeAlexaAccount(id) {
   const value = String(id || "").trim();
@@ -56,6 +67,10 @@ function load(userId) {
     data.habit_logs = Array.isArray(data.habit_logs) ? data.habit_logs : [];
     const rawNudges = Array.isArray(data.day_nudges) ? data.day_nudges : [];
     data.day_nudges = pruneDayNudges(rawNudges);
+    data.deleted_tasks = Array.isArray(data.deleted_tasks) ? data.deleted_tasks : [];
+    data.deleted_habits = Array.isArray(data.deleted_habits) ? data.deleted_habits : [];
+    data.deleted_day_nudges = Array.isArray(data.deleted_day_nudges) ? data.deleted_day_nudges : [];
+    data.deleted_lists = Array.isArray(data.deleted_lists) ? data.deleted_lists : [];
     if (data.day_nudges.length !== rawNudges.length) save(userId, data);
     if (!data.alexa || typeof data.alexa !== "object") data.alexa = null;
     return data;
@@ -78,6 +93,25 @@ function mergeById(localItems, remoteItems) {
     if (wins(item, map.get(item.id))) map.set(item.id, item);
   }
   return [...map.values()];
+}
+
+function mergeDeleted(localItems, remoteItems) {
+  const map = new Map();
+  for (const item of [...(localItems || []), ...(remoteItems || [])]) {
+    if (!item || !item.id) continue;
+    const at = Number(item.deleted_at || 0);
+    const prev = map.get(item.id);
+    if (prev == null || at >= prev) map.set(item.id, at);
+  }
+  const cutoff = Date.now() - 30 * 86_400_000;
+  return [...map.entries()]
+    .filter((entry) => entry[1] >= cutoff)
+    .map(([id, deleted_at]) => ({ id, deleted_at }));
+}
+
+function withoutDeleted(items, deleted) {
+  const ids = new Set((deleted || []).map((item) => item.id));
+  return (items || []).filter((item) => !ids.has(item.id));
 }
 
 function mergeLogs(localItems, remoteItems) {
@@ -180,6 +214,17 @@ async function withGemini(base, user) {
   return base;
 }
 
+function shouldListNudges(intent, title, utterance) {
+  if (intent === "LIST_NUDGES") return true;
+  const text = `${title || ""} ${utterance || ""}`.toLowerCase();
+  if (text.indexOf("aviso") === -1) return false;
+  if (intent === "LIST_TASKS" || intent === "INSIGHTS") return true;
+  if (intent === "ADD_TASK") {
+    return /(cual|cuáles|lista|qu[eé]|mis avisos|avisos de hoy)/.test(text);
+  }
+  return false;
+}
+
 function defaultList(user) {
   let list = user.lists[0];
   if (!list) {
@@ -192,8 +237,12 @@ function defaultList(user) {
 
 async function alexa(user, body) {
   const linked = rememberAlexa(user, body);
-  const intent = body.intent || "INSIGHTS";
+  let intent = body.intent || "INSIGHTS";
   const title = body.task?.title || body.utterance || "";
+  if (shouldListNudges(intent, title, body.utterance)) intent = "LIST_NUDGES";
+  user.tasks = withoutDeleted(user.tasks, user.deleted_tasks);
+  user.habits = withoutDeleted(user.habits, user.deleted_habits);
+  user.day_nudges = withoutDeleted(user.day_nudges, user.deleted_day_nudges);
   const now = Date.now();
   const userId = body.user_id;
   if (linked) save(userId, user);
@@ -234,7 +283,10 @@ async function alexa(user, body) {
   }
   if (intent === "LIST_TASKS") {
     const open = user.tasks.filter((item) => !item.is_done).map((item) => item.title);
-    return { speak: open.length ? `Te quedan: ${open.slice(0, 5).join(", ")}.` : "No tienes tareas pendientes. Respira.", intent };
+    return {
+      speak: open.length ? `Tareas pendientes: ${open.slice(0, 5).join(", ")}.` : "No tienes tareas pendientes. Respira.",
+      intent,
+    };
   }
   if (intent === "ADD_HABIT" && title) {
     user.habits.push({
@@ -361,12 +413,20 @@ http
       if (req.method === "PUT" && url.pathname === "/api/v3/sync") {
         const incoming = await bodyOf(req);
         const local = load(userId);
+        const deleted_tasks = mergeDeleted(local.deleted_tasks, incoming.deleted_tasks);
+        const deleted_habits = mergeDeleted(local.deleted_habits, incoming.deleted_habits);
+        const deleted_day_nudges = mergeDeleted(local.deleted_day_nudges, incoming.deleted_day_nudges);
+        const deleted_lists = mergeDeleted(local.deleted_lists, incoming.deleted_lists);
         const merged = {
-          lists: mergeById(local.lists, incoming.lists),
-          tasks: mergeById(local.tasks, incoming.tasks),
-          habits: mergeById(local.habits, incoming.habits),
+          lists: withoutDeleted(mergeById(local.lists, incoming.lists), deleted_lists),
+          tasks: withoutDeleted(mergeById(local.tasks, incoming.tasks), deleted_tasks),
+          habits: withoutDeleted(mergeById(local.habits, incoming.habits), deleted_habits),
           habit_logs: mergeLogs(local.habit_logs, incoming.habit_logs),
-          day_nudges: pruneDayNudges(mergeById(local.day_nudges, incoming.day_nudges)),
+          day_nudges: pruneDayNudges(withoutDeleted(mergeById(local.day_nudges, incoming.day_nudges), deleted_day_nudges)),
+          deleted_tasks,
+          deleted_habits,
+          deleted_day_nudges,
+          deleted_lists,
           alexa: local.alexa || null,
         };
         save(userId, merged);

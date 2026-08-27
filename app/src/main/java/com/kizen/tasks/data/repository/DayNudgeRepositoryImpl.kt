@@ -11,6 +11,7 @@ import com.kizen.tasks.notification.KizenNotifier
 import com.kizen.tasks.notification.ReminderScheduler
 import com.kizen.tasks.sync.AlexaChimeClient
 import com.kizen.tasks.sync.SyncPort
+import com.kizen.tasks.sync.TombstoneStore
 import com.kizen.tasks.widget.WidgetRefresher
 import dagger.hilt.android.qualifiers.ApplicationContext
 import android.content.Context
@@ -30,6 +31,7 @@ class DayNudgeRepositoryImpl @Inject constructor(
     private val widgetRefresher: WidgetRefresher,
     private val syncPort: SyncPort,
     private val alexaChime: AlexaChimeClient,
+    private val tombstones: TombstoneStore,
 ) : DayNudgeRepository {
 
     override fun observeToday(): Flow<List<DayNudge>> {
@@ -61,6 +63,7 @@ class DayNudgeRepositoryImpl @Inject constructor(
     }
 
     override suspend fun upsert(nudge: DayNudge) {
+        tombstones.clearNudge(nudge.id)
         nudgeDao.upsert(nudge.toEntity())
         reminderScheduler.syncNudge(nudge)
         widgetRefresher.refresh()
@@ -84,6 +87,7 @@ class DayNudgeRepositoryImpl @Inject constructor(
         reminderScheduler.cancelNudge(id)
         KizenNotifier.cancel(context, nudgeNotifyId(id))
         alexaChime.enqueueNudge(id, cancel = true)
+        tombstones.markNudge(id)
         nudgeDao.delete(id)
         widgetRefresher.refresh()
         pushCloud()

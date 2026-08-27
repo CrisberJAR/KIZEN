@@ -6,6 +6,7 @@ import com.kizen.tasks.data.local.toDomain
 import com.kizen.tasks.data.local.toEntity
 import com.kizen.tasks.domain.model.TaskList
 import com.kizen.tasks.domain.repository.ListRepository
+import com.kizen.tasks.sync.TombstoneStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
@@ -14,6 +15,7 @@ import javax.inject.Singleton
 @Singleton
 class ListRepositoryImpl @Inject constructor(
     private val listDao: TaskListDao,
+    private val tombstones: TombstoneStore,
 ) : ListRepository {
 
     override fun observeLists(): Flow<List<TaskList>> =
@@ -25,10 +27,12 @@ class ListRepositoryImpl @Inject constructor(
         }
 
     override suspend fun upsert(list: TaskList) {
+        tombstones.clearList(list.id)
         listDao.upsert(list.toEntity())
     }
 
     override suspend fun delete(id: String) {
+        tombstones.markList(id)
         listDao.delete(id)
     }
 

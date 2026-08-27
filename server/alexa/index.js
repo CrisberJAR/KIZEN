@@ -128,7 +128,23 @@ function postJson(pathname, body) {
   });
 }
 
-async function sendToKizen(handlerInput, intent, extra = {}) {
+function looksLikeAvisos(text) {
+  const value = String(text || "").toLowerCase();
+  return value.indexOf("aviso") !== -1;
+}
+
+function kizenIntent(handlerInput) {
+  const name = Alexa.getIntentName(handlerInput.requestEnvelope);
+  const mapped = INTENT_MAP[name];
+  const title = titleFrom(handlerInput);
+  if (looksLikeAvisos(title) && (mapped === "LIST_TASKS" || mapped === "ADD_TASK" || mapped === "INSIGHTS")) {
+    return "LIST_NUDGES";
+  }
+  return mapped;
+}
+
+async function sendToKizen(handlerInput, intent, extra) {
+  extra = extra || {};
   const userId = Alexa.getUserId(handlerInput.requestEnvelope);
   const title = titleFrom(handlerInput);
   const listName = slot(handlerInput, "list");
@@ -216,7 +232,7 @@ const KizenIntentHandler = {
   },
   async handle(handlerInput) {
     const alexaIntent = Alexa.getIntentName(handlerInput.requestEnvelope);
-    const intent = INTENT_MAP[alexaIntent];
+    const intent = kizenIntent(handlerInput);
     try {
       const text = await sendToKizen(handlerInput, intent);
       if (

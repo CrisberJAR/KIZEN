@@ -8,6 +8,8 @@ import com.kizen.tasks.domain.model.Subtask
 import com.kizen.tasks.domain.model.Task
 import com.kizen.tasks.domain.repository.TaskRepository
 import com.kizen.tasks.notification.ReminderScheduler
+import com.kizen.tasks.sync.SyncPort
+import com.kizen.tasks.sync.TombstoneStore
 import com.kizen.tasks.widget.WidgetRefresher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -23,6 +25,8 @@ class TaskRepositoryImpl @Inject constructor(
     private val subtaskDao: SubtaskDao,
     private val reminderScheduler: ReminderScheduler,
     private val widgetRefresher: WidgetRefresher,
+    private val tombstones: TombstoneStore,
+    private val syncPort: SyncPort,
 ) : TaskRepository {
 
     override fun observeToday(): Flow<List<Task>> {
@@ -51,9 +55,11 @@ class TaskRepositoryImpl @Inject constructor(
     override suspend fun getTask(id: String): Task? = taskDao.getById(id)?.toDomain()
 
     override suspend fun upsert(task: Task) {
+        tombstones.clearTask(task.id)
         taskDao.upsert(task.toEntity())
         reminderScheduler.sync(task)
         widgetRefresher.refresh()
+        pushCloud()
     }
 
     override suspend fun setDone(id: String, done: Boolean) {
@@ -66,8 +72,10 @@ class TaskRepositoryImpl @Inject constructor(
 
     override suspend fun delete(id: String) {
         reminderScheduler.cancel(id)
+        tombstones.markTask(id)
         taskDao.delete(id)
         widgetRefresher.refresh()
+        pushCloud()
     }
 
     override suspend fun upsertSubtask(subtask: Subtask) {
@@ -91,5 +99,9 @@ class TaskRepositoryImpl @Inject constructor(
 
     override suspend fun pruneCompletedBefore(before: Long) {
         taskDao.deleteCompletedBefore(before)
+    }
+
+    private suspend fun pushCloud() {
+        if (syncPort.isEnabled) runCatching { syncPort.push() }
     }
 }

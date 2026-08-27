@@ -11,6 +11,7 @@ import com.kizen.tasks.domain.model.RepeatDays
 import com.kizen.tasks.domain.model.StreakCalculator
 import com.kizen.tasks.domain.repository.HabitRepository
 import com.kizen.tasks.notification.ReminderScheduler
+import com.kizen.tasks.sync.TombstoneStore
 import com.kizen.tasks.widget.WidgetRefresher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -27,6 +28,7 @@ class HabitRepositoryImpl @Inject constructor(
     private val logDao: HabitLogDao,
     private val reminderScheduler: ReminderScheduler,
     private val widgetRefresher: WidgetRefresher,
+    private val tombstones: TombstoneStore,
 ) : HabitRepository {
 
     override fun observeToday(): Flow<List<Habit>> {
@@ -51,6 +53,7 @@ class HabitRepositoryImpl @Inject constructor(
     }
 
     override suspend fun upsert(habit: Habit) {
+        tombstones.clearHabit(habit.id)
         habitDao.upsert(habit.toEntity())
         reminderScheduler.syncHabit(habit)
         widgetRefresher.refresh()
@@ -85,6 +88,7 @@ class HabitRepositoryImpl @Inject constructor(
 
     override suspend fun delete(id: String) {
         reminderScheduler.cancelHabit(id)
+        tombstones.markHabit(id)
         habitDao.delete(id)
         widgetRefresher.refresh()
     }
