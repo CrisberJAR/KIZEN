@@ -1,7 +1,7 @@
 /** Recordatorios de Alexa: el teléfono avisa y el Echo suena solo. */
 
 const DEBOUNCE_MS = 90_000;
-const RING_IN_SECONDS = 60;
+const RING_IN_SECONDS = 5;
 const TZ = process.env.KIZEN_TZ || "America/Lima";
 
 export function clientSnapshot(user) {
@@ -66,7 +66,8 @@ export async function chimeNudge(user, payload, userId, save) {
     return { ok: false, reason: "no_alexa" };
   }
 
-  const created = await createReminder(user.alexa, title, { offsetSeconds: RING_IN_SECONDS });
+  await deleteAlert(user, id);
+  const created = await createReminder(user.alexa, title, { at: Date.now() + 5_000 });
   if (!user.alexa.alerts) user.alexa.alerts = {};
   if (!user.alexa.last_chime) user.alexa.last_chime = {};
   if (created.alertToken) rememberToken(user, id, created.alertToken);

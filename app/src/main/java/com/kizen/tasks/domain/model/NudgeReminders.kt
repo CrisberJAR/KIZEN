@@ -11,6 +11,6 @@ fun nextNudgeMillis(
     if (nowMillis < nudge.startAt) return nudge.startAt
     val stepsDone = (nowMillis - nudge.startAt) / interval
     var next = nudge.startAt + (stepsDone + 1) * interval
-    if (next - nowMillis < 10_000L) next += interval
+    if (next - nowMillis < 10_000L) next = nowMillis + 10_000L
     return next
 }

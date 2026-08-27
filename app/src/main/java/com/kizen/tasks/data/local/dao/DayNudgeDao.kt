@@ -35,6 +35,9 @@ interface DayNudgeDao {
     @Query("UPDATE day_nudges SET isDone = :done, updatedAt = :updatedAt WHERE id = :id")
     suspend fun setDone(id: String, done: Boolean, updatedAt: Long)
 
+    @Query("UPDATE day_nudges SET updatedAt = :updatedAt WHERE id = :id")
+    suspend fun touch(id: String, updatedAt: Long)
+
     @Query("DELETE FROM day_nudges WHERE id = :id")
     suspend fun delete(id: String)
 

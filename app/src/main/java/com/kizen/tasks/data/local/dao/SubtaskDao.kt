@@ -28,4 +28,10 @@ interface SubtaskDao {
 
     @Query("DELETE FROM subtasks WHERE id = :id")
     suspend fun delete(id: String)
+
+    @Query("DELETE FROM subtasks WHERE taskId = :taskId")
+    suspend fun deleteByTask(taskId: String)
+
+    @Query("SELECT * FROM subtasks WHERE id = :id")
+    suspend fun get(id: String): SubtaskEntity?
 }

@@ -31,4 +31,7 @@ interface NudgeItemDao {
 
     @Query("DELETE FROM nudge_items WHERE nudgeId = :nudgeId")
     suspend fun deleteByNudge(nudgeId: String)
+
+    @Query("SELECT * FROM nudge_items WHERE id = :id")
+    suspend fun get(id: String): NudgeItemEntity?
 }

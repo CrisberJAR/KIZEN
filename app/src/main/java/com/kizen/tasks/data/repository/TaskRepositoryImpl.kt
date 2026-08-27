@@ -79,18 +79,24 @@ class TaskRepositoryImpl @Inject constructor(
 
     override suspend fun upsertSubtask(subtask: Subtask) {
         subtaskDao.upsert(subtask.toEntity())
+        taskDao.touch(subtask.taskId, System.currentTimeMillis())
         widgetRefresher.refresh()
         pushCloud()
     }
 
     override suspend fun setSubtaskDone(id: String, done: Boolean) {
-        subtaskDao.setDone(id, done, System.currentTimeMillis())
+        val now = System.currentTimeMillis()
+        val item = subtaskDao.get(id)
+        subtaskDao.setDone(id, done, now)
+        if (item != null) taskDao.touch(item.taskId, now)
         widgetRefresher.refresh()
         pushCloud()
     }
 
     override suspend fun deleteSubtask(id: String) {
+        val item = subtaskDao.get(id)
         subtaskDao.delete(id)
+        if (item != null) taskDao.touch(item.taskId, System.currentTimeMillis())
         widgetRefresher.refresh()
         pushCloud()
     }

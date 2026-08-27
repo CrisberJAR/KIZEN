@@ -92,6 +92,7 @@ class SyncLocalStore @Inject constructor(
             if (local == null || dto.updatedAt >= local.updatedAt) {
                 val listId = listDao.get(dto.listId)?.id ?: fallbackListId ?: return@forEach
                 taskDao.upsert(dto.toEntity(listId))
+                subtaskDao.deleteByTask(dto.id)
                 dto.subtasks.forEach { subtaskDao.upsert(it.toEntity(dto.id)) }
             }
         }
@@ -107,6 +108,8 @@ class SyncLocalStore @Inject constructor(
             }
         }
         remote.habitLogs.forEach { dto ->
+            if (dto.habitId in tombstones.habitIds()) return@forEach
+            if (habitDao.get(dto.habitId) == null) return@forEach
             val local = habitLogDao.forDay(dto.habitId, dto.dayEpoch)
             if (local == null || dto.completedAt >= local.completedAt) {
                 if (local != null && local.id != dto.id) {
@@ -209,6 +212,7 @@ private fun SubtaskEntity.toDto() = SubtaskDto(
     title = title,
     isDone = isDone,
     position = position,
+    updatedAt = updatedAt,
 )
 
 private fun SubtaskDto.toEntity(taskId: String) = SubtaskEntity(
@@ -217,7 +221,7 @@ private fun SubtaskDto.toEntity(taskId: String) = SubtaskEntity(
     title = title,
     isDone = isDone,
     position = position,
-    updatedAt = System.currentTimeMillis(),
+    updatedAt = if (updatedAt > 0L) updatedAt else System.currentTimeMillis(),
     remoteId = id,
 )
 
@@ -302,6 +306,7 @@ private fun NudgeItemEntity.toDto() = NudgeItemDto(
     title = title,
     isDone = isDone,
     position = position,
+    updatedAt = updatedAt,
 )
 
 private fun NudgeItemDto.toEntity(nudgeId: String) = NudgeItemEntity(
@@ -310,5 +315,5 @@ private fun NudgeItemDto.toEntity(nudgeId: String) = NudgeItemEntity(
     title = title,
     isDone = isDone,
     position = position,
-    updatedAt = System.currentTimeMillis(),
+    updatedAt = if (updatedAt > 0L) updatedAt else System.currentTimeMillis(),
 )

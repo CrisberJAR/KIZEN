@@ -95,18 +95,24 @@ class DayNudgeRepositoryImpl @Inject constructor(
 
     override suspend fun upsertItem(item: NudgeItem) {
         itemDao.upsert(item.toEntity())
+        nudgeDao.touch(item.nudgeId, System.currentTimeMillis())
         widgetRefresher.refresh()
         pushCloud()
     }
 
     override suspend fun setItemDone(id: String, done: Boolean) {
-        itemDao.setDone(id, done, System.currentTimeMillis())
+        val now = System.currentTimeMillis()
+        val item = itemDao.get(id)
+        itemDao.setDone(id, done, now)
+        if (item != null) nudgeDao.touch(item.nudgeId, now)
         widgetRefresher.refresh()
         pushCloud()
     }
 
     override suspend fun deleteItem(id: String) {
+        val item = itemDao.get(id)
         itemDao.delete(id)
+        if (item != null) nudgeDao.touch(item.nudgeId, System.currentTimeMillis())
         widgetRefresher.refresh()
         pushCloud()
     }

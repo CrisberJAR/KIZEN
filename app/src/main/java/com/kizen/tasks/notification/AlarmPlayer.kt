@@ -16,19 +16,29 @@ object AlarmPlayer {
     ) {
         val power = context.getSystemService(Context.POWER_SERVICE) as PowerManager
         val wake = power.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "kizen:alarm")
-        wake.acquire(durationMs + 2_000L)
-        val uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
-            ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
-        val ringtone = RingtoneManager.getRingtone(context, uri)
-        ringtone.audioAttributes = AudioAttributes.Builder()
-            .setUsage(AudioAttributes.USAGE_ALARM)
-            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-            .build()
-        ringtone.play()
-        Handler(Looper.getMainLooper()).postDelayed({
-            runCatching { if (ringtone.isPlaying) ringtone.stop() }
+        try {
+            wake.acquire(durationMs + 2_000L)
+            val uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+                ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+            val ringtone = RingtoneManager.getRingtone(context, uri)
+            if (ringtone == null) {
+                runCatching { if (wake.isHeld) wake.release() }
+                runCatching { pending?.finish() }
+                return
+            }
+            ringtone.audioAttributes = AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_ALARM)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .build()
+            ringtone.play()
+            Handler(Looper.getMainLooper()).postDelayed({
+                runCatching { if (ringtone.isPlaying) ringtone.stop() }
+                runCatching { if (wake.isHeld) wake.release() }
+                runCatching { pending?.finish() }
+            }, durationMs)
+        } catch (_: Throwable) {
             runCatching { if (wake.isHeld) wake.release() }
             runCatching { pending?.finish() }
-        }, durationMs)
+        }
     }
 }

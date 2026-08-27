@@ -123,6 +123,11 @@ function withoutDeleted(items, deleted) {
   return (items || []).filter((item) => !ids.has(item.id));
 }
 
+function logsWithoutDeletedHabits(logs, deletedHabits) {
+  const ids = new Set((deletedHabits || []).map((item) => item.id));
+  return (logs || []).filter((item) => !ids.has(item.habit_id));
+}
+
 function mergeLogs(localItems, remoteItems) {
   const map = new Map();
   for (const item of [...(localItems || []), ...(remoteItems || [])]) {
@@ -335,12 +340,16 @@ async function alexa(user, body) {
   if (intent === "COMPLETE_HABIT") {
     const habit = user.habits.find((item) => title && item.title.toLowerCase().includes(title.toLowerCase()));
     if (!habit) return { speak: "No encontré ese hábito.", intent };
-    user.habit_logs.push({
-      id: randomUUID(),
-      habit_id: habit.id,
-      day_epoch: dayEpoch(),
-      completed_at: now,
-    });
+    const epoch = dayEpoch();
+    const goal = Math.max(1, Number(habit.times_per_day || 1));
+    if (!Array.isArray(user.habit_logs)) user.habit_logs = [];
+    let log = user.habit_logs.find((item) => item.habit_id === habit.id && Number(item.day_epoch) === epoch);
+    if (!log) {
+      log = { id: randomUUID(), habit_id: habit.id, day_epoch: epoch, count: 0, completed_at: now };
+      user.habit_logs.push(log);
+    }
+    log.count = Math.min(goal, Number(log.count || 0) + 1);
+    log.completed_at = now;
     habit.current_streak = Number(habit.current_streak || 0) + 1;
     habit.longest_streak = Math.max(Number(habit.longest_streak || 0), habit.current_streak);
     habit.updated_at = now;
@@ -448,7 +457,7 @@ http
             lists: withoutDeleted(mergeById(local.lists, incoming.lists), deleted_lists),
             tasks: withoutDeleted(mergeById(local.tasks, incoming.tasks), deleted_tasks),
             habits: withoutDeleted(mergeById(local.habits, incoming.habits), deleted_habits),
-            habit_logs: mergeLogs(local.habit_logs, incoming.habit_logs),
+            habit_logs: logsWithoutDeletedHabits(mergeLogs(local.habit_logs, incoming.habit_logs), deleted_habits),
             day_nudges: pruneDayNudges(withoutDeleted(mergeById(local.day_nudges, incoming.day_nudges), deleted_day_nudges)),
             deleted_tasks,
             deleted_habits,

@@ -30,6 +30,7 @@ data class SubtaskDto(
     val title: String,
     @SerialName("is_done") val isDone: Boolean = false,
     val position: Int = 0,
+    @SerialName("updated_at") val updatedAt: Long = 0,
 )
 
 @Serializable
